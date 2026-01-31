@@ -74,6 +74,14 @@ This plugin is inspired by features from reference plugins, and adds per-board (
 - The timeline is based on calendar events.
 - If you do not need kanban, disable **Enable kanban** to simplify the UI.
 
+## References
+
+This plugin was built with inspiration from the following Obsidian plugins:
+
+- https://github.com/mgmeyers/obsidian-kanban
+- https://github.com/obsidian-community/obsidian-full-calendar
+- https://github.com/ivan-lednev/obsidian-day-planner
+
 ## License
 
 0-BSD
