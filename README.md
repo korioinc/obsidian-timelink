@@ -1,90 +1,79 @@
-# Obsidian Sample Plugin
+# TimeLink
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+TimeLink is an Obsidian community plugin that connects a calendar, timeline, and kanban board in one place. It is designed to keep your tasks and events as linked notes without breaking your flow.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+Organize your to-do list with a kanban board and turn events written on the board into calendar items for schedule management. Use the timeline to manage tasks in detail and wrap up your day cleanly.
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+This plugin is inspired by features from reference plugins, and adds per-board (category) color assignments so you can separate tasks more clearly in the calendar and timeline.
 
-## First time developing plugins?
+## Key features
 
-Quick starting guide for new plugin devs:
+- Calendar: Create event notes and manage them by date.
+- Timeline: View events along a chronological flow.
+- Kanban board: Manage work on a board and link cards with event notes.
+- Board colors: Assign category colors to distinguish tasks in calendar/timeline views.
+- Link automation: Events created from cards link back to their cards.
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## Screenshots
 
-## Releasing new releases
+### Kanban board
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+![Kanban board](assets/img.png)
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+### Calendar
 
-## Adding your plugin to the community plugin list
+![Calendar](assets/img_1.png)
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+### Color settings and timeline panel
 
-## How to use
+![Color settings and timeline](assets/img_2.png)
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+### Default kanban board color
 
-## Manually installing the plugin
+![Default kanban board color](assets/img_3.png)
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+### Board color applied → Calendar event inherits board color
 
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
+![Board color applied](assets/img_4.png)
 
-## Funding URL
+## Getting started
 
-You can include funding URLs where people who use your plugin can financially support it.
+1. **Open from the ribbon**
+   - Calendar: calendar ribbon icon
+   - Timeline: timeline ribbon icon
+   - Kanban: kanban ribbon icon
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+2. **Open from the command palette**
+   - **Open timeline**
+   - **Create kanban board**
+   - **Open active kanban board**
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
-```
+3. **Create a board from a folder menu**
+   - File explorer → right-click a folder → **New kanban board**
 
-If you have multiple URLs, you can also do:
+## Workflow
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+### Kanban card → Create event
 
-## API Documentation
+- From a kanban card menu, select **Create event from card**.
+- A card note and an event note are created and linked.
 
-See https://docs.obsidian.md
+### Link behavior
+
+- Cards include links to their card notes.
+- Event notes include links back to the card.
+
+## Settings
+
+- **Enable kanban**: Turn kanban board features on or off.
+- **Calendar folder**: Set the folder where calendar event notes are stored.
+
+## Tips
+
+- Create the calendar folder in advance to keep event notes organized.
+- The timeline is based on calendar events.
+- If you do not need kanban, disable **Enable kanban** to simplify the UI.
+
+## License
+
+0-BSD

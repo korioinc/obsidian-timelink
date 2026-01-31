@@ -1,29 +1,59 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-timelink",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "Kanban board, calendar, and timeline views with linked event notes for Obsidian.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
-		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"dev": "concurrently -k \"node esbuild.config.mjs\" \"node build-tailwind.mjs watch\"",
+		"build": "node build-tailwind.mjs production && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"lint": "eslint ."
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"format": "prettier --write .",
+		"format:check": "prettier --check .",
+		"test": "node --test src/**/*.test.ts"
 	},
-	"keywords": [],
+	"keywords": [
+		"obsidian",
+		"obsidian-plugin",
+		"kanban",
+		"calendar",
+		"timeline"
+	],
 	"license": "0-BSD",
+	"engines": {
+		"node": ">=20 <25",
+		"npm": ">=10 <11"
+	},
 	"devDependencies": {
-		"@types/node": "^16.11.6",
-		"esbuild": "0.25.5",
-		"eslint-plugin-obsidianmd": "0.1.9",
-		"globals": "14.0.0",
-		"tslib": "2.4.0",
-		"typescript": "^5.8.3",
-		"typescript-eslint": "8.35.1",
 		"@eslint/js": "9.30.1",
-		"jiti": "2.6.1"
+		"@tailwindcss/cli": "^4.1.18",
+		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
+		"@types/node": "^16.18.126",
+		"@typescript-eslint/eslint-plugin": "^8.54.0",
+		"concurrently": "^9.2.1",
+		"esbuild": "0.25.5",
+		"eslint-config-prettier": "^9.1.2",
+		"eslint-plugin-import": "^2.32.0",
+		"eslint-plugin-obsidianmd": "0.1.9",
+		"eslint-plugin-prettier": "^5.5.5",
+		"eslint-plugin-promise": "^7.2.1",
+		"globals": "14.0.0",
+		"jiti": "2.6.1",
+		"prettier": "^3.8.1",
+		"prettier-plugin-tailwindcss": "^0.7.2",
+		"tailwindcss": "^4.1.18",
+		"tslib": "2.4.0",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.54.0"
 	},
 	"dependencies": {
-		"obsidian": "latest"
+		"@atlaskit/pragmatic-drag-and-drop": "^1.7.7",
+		"@codemirror/state": "6.5.0",
+		"@codemirror/view": "6.38.6",
+		"obsidian": "latest",
+		"preact": "^10.28.3",
+		"rrule": "^2.8.1"
 	}
 }

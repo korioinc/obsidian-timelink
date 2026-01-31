@@ -20,3 +20,8 @@ data.json
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# Exclude generated JavaScript files under src
+src/**/*.js
+src/**/*.cjs
+src/**/*.mjs
