@@ -76,8 +76,8 @@ export class FullNoteCalendar {
 	}
 
 	getEventsInFile(file: TFile): EditableEventResponse[] {
-	const cache = this.plugin.app.metadataCache.getFileCache(file);
-	const frontmatter = cache?.frontmatter;
+		const cache = this.plugin.app.metadataCache.getFileCache(file);
+		const frontmatter = cache?.frontmatter;
 		if (!frontmatter) {
 			return [];
 		}

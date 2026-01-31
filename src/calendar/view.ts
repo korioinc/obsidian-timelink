@@ -26,6 +26,7 @@ export class TimeLinkCalendarView extends ItemView {
 	}
 
 	async onOpen(): Promise<void> {
+		await super.onOpen();
 		const container = this.containerEl.children[1] as HTMLElement | undefined;
 		if (!container) {
 			return;
@@ -47,6 +48,7 @@ export class TimeLinkCalendarView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
+		await super.onClose();
 		const container = this.containerEl.children[1] as HTMLElement | undefined;
 		if (container) {
 			unmountCalendarUI(container);

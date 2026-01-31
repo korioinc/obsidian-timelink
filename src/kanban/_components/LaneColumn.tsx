@@ -10,7 +10,7 @@ import {
 import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
 import type { DragLocation } from '@atlaskit/pragmatic-drag-and-drop/types';
 import type { App, Component } from 'obsidian';
-import { MarkdownRenderer, Menu, Notice, TFile, parseLinktext } from 'obsidian';
+import { MarkdownRenderer, Menu, Modal, Notice, TFile, parseLinktext } from 'obsidian';
 import { h } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
@@ -88,7 +88,47 @@ const getObsidianDraggable = (app: App): ObsidianDraggable => {
 		?.draggable;
 };
 
-const confirmAction = (message: string): boolean => window.confirm(message);
+type ConfirmResult = (value: boolean) => void;
+
+class ConfirmModal extends Modal {
+	private message: string;
+	private onResolve: ConfirmResult;
+
+	constructor(app: App, message: string, onResolve: ConfirmResult) {
+		super(app);
+		this.message = message;
+		this.onResolve = onResolve;
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.empty();
+		contentEl.createEl('p', { text: this.message });
+		const actions = contentEl.createDiv({ cls: 'modal-button-container' });
+		const cancelButton = actions.createEl('button', { text: 'Cancel' });
+		cancelButton.addEventListener('click', () => {
+			this.onResolve(false);
+			this.close();
+		});
+		const confirmButton = actions.createEl('button', { text: 'Confirm', cls: 'mod-cta' });
+		confirmButton.addEventListener('click', () => {
+			this.onResolve(true);
+			this.close();
+		});
+	}
+
+	onClose(): void {
+		this.onResolve(false);
+		this.contentEl.empty();
+	}
+}
+
+const confirmAction = (app: App, message: string): Promise<boolean> => {
+	return new Promise((resolve) => {
+		const modal = new ConfirmModal(app, message, resolve);
+		modal.open();
+	});
+};
 
 const draggableToLinks = (app: App, sourcePath: string, draggable: ObsidianDraggable): string[] => {
 	if (!draggable) return [];
@@ -463,9 +503,11 @@ export function LaneColumn({
 		menu.addSeparator();
 		menu.addItem((item) => {
 			item.setTitle('Delete card').onClick(() => {
-				const ok = confirmAction('Delete this card?');
-				if (!ok) return;
-				void _onRemoveCard(cardId);
+				void (async () => {
+					const ok = await confirmAction(markdownContext.app, 'Delete this card?');
+					if (!ok) return;
+					await _onRemoveCard(cardId);
+				})();
 			});
 		});
 		menu.showAtMouseEvent(event);
@@ -563,9 +605,14 @@ export function LaneColumn({
 							tabIndex={0}
 							className="inline-flex cursor-pointer items-center justify-center rounded-md p-0.5 text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
 							onClick={() => {
-								const ok = confirmAction(`Remove List "${lane.title}"?`);
-								if (!ok) return;
-								void onRemoveLane(lane.id);
+								void (async () => {
+									const ok = await confirmAction(
+										markdownContext.app,
+										`Remove List "${lane.title}"?`,
+									);
+									if (!ok) return;
+									await onRemoveLane(lane.id);
+								})();
 							}}
 						>
 							<RemoveIcon className="h-4 w-4" />
