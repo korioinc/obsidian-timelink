@@ -1,0 +1,676 @@
+import type { KanbanBoard } from '../parser';
+import { CardEditorInput } from './CardEditorInput';
+import { isCardDragData, isLaneDragData, readCardOrder, readLaneOrder } from './drag';
+import { CheckIcon, ChevronIcon, DragIcon, MenuIcon, RemoveIcon, XIcon } from './icons';
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import {
+	draggable,
+	dropTargetForElements,
+} from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unhandled';
+import type { DragLocation } from '@atlaskit/pragmatic-drag-and-drop/types';
+import type { App, Component } from 'obsidian';
+import { MarkdownRenderer, Menu, Notice, TFile, parseLinktext } from 'obsidian';
+import { h } from 'preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
+
+type LaneColumnProps = {
+	markdownContext: {
+		app: App;
+		component: Component;
+		sourcePath: string;
+	};
+	lane: KanbanBoard['lanes'][number];
+	wrapperRef: { current: HTMLDivElement | null };
+	layout?: 'board' | 'list';
+	onCreateNoteFromCard: (cardId: string) => void;
+	onCopyCardLink: (cardId: string) => void;
+	onCreateEventFromCard: (cardId: string) => void;
+	onRemoveLane: (laneId: string) => Promise<void>;
+	onReorderLanes: (order: string[]) => Promise<void>;
+	onUpdateLaneTitle: (laneId: string, title: string) => Promise<void>;
+	onAddCard: (laneId: string, title: string) => Promise<void>;
+	onRemoveCard: (cardId: string) => Promise<void>;
+	onUpdateCardTitle: (cardId: string, title: string) => Promise<void>;
+	onMoveCard: (cardId: string, laneId: string, index: number) => Promise<void>;
+};
+
+type MarkdownContext = LaneColumnProps['markdownContext'];
+
+function CardTitle({
+	title,
+	markdownContext,
+}: {
+	title: string;
+	markdownContext: MarkdownContext;
+}) {
+	const hostRef = useRef<HTMLSpanElement>(null);
+	useEffect(() => {
+		const host = hostRef.current;
+		if (!host) return;
+		host.innerHTML = '';
+		const displayTitle = title.replace(/\r\n/g, '\n').replace(/\n/g, '<br>');
+		void MarkdownRenderer.render(
+			markdownContext.app,
+			displayTitle,
+			host,
+			markdownContext.sourcePath,
+			markdownContext.component,
+		);
+		const handleClick = (event: MouseEvent) => {
+			const target = event.target as HTMLElement | null;
+			if (!target) return;
+			const anchor = target.closest('a');
+			if (!anchor) return;
+			const href = anchor.getAttribute('data-href') ?? anchor.getAttribute('href');
+			if (!href) return;
+			event.preventDefault();
+			event.stopPropagation();
+			void markdownContext.app.workspace.openLinkText(href, markdownContext.sourcePath, true);
+		};
+		host.addEventListener('click', handleClick);
+		return () => {
+			host.removeEventListener('click', handleClick);
+			host.innerHTML = '';
+		};
+	}, [title, markdownContext.app, markdownContext.component, markdownContext.sourcePath]);
+	return <span ref={hostRef} className="block pr-6" />;
+}
+
+type ObsidianDraggable =
+	| { type: 'file'; file: TFile }
+	| { type: 'link'; linktext: string; file?: TFile }
+	| null
+	| undefined;
+
+const getObsidianDraggable = (app: App): ObsidianDraggable => {
+	return (app as unknown as { dragManager?: { draggable?: ObsidianDraggable } }).dragManager
+		?.draggable;
+};
+
+const draggableToLinks = (app: App, sourcePath: string, draggable: ObsidianDraggable): string[] => {
+	if (!draggable) return [];
+	switch (draggable.type) {
+		case 'file':
+			return [
+				app.fileManager.generateMarkdownLink(
+					draggable.file,
+					sourcePath,
+					'',
+					draggable.file.basename,
+				),
+			];
+		case 'link': {
+			if (draggable.file) {
+				const parsed = parseLinktext(draggable.linktext);
+				const subpath = parsed?.subpath ?? '';
+				return [
+					app.fileManager.generateMarkdownLink(
+						draggable.file,
+						sourcePath,
+						subpath,
+						draggable.file.basename,
+					),
+				];
+			}
+			return [`[[${draggable.linktext}]]`];
+		}
+		default:
+			return [];
+	}
+};
+
+export function LaneColumn({
+	markdownContext,
+	lane,
+	wrapperRef,
+	layout = 'board',
+	onCreateNoteFromCard,
+	onCopyCardLink,
+	onCreateEventFromCard,
+	onRemoveLane,
+	onReorderLanes,
+	onUpdateLaneTitle,
+	onAddCard,
+	onRemoveCard: _onRemoveCard,
+	onUpdateCardTitle,
+	onMoveCard,
+}: LaneColumnProps): h.JSX.Element {
+	const laneRef = useRef<HTMLDivElement>(null);
+	const listRef = useRef<HTMLUListElement>(null);
+	const dragHandleRef = useRef<HTMLDivElement>(null);
+	const isSubmittingCardRef = useRef(false);
+	const cardCleanupRef = useRef(new Map<HTMLElement, () => void>());
+	const interactionLockRef = useRef(false);
+	const laneOrderRef = useRef<string[] | null>(null);
+	const cardOrderRef = useRef<{ listEl: HTMLUListElement; order: string[] } | null>(null);
+	const [isAdding, setIsAdding] = useState(false);
+	const [draftTitle, setDraftTitle] = useState('');
+	const [isEditingTitle, setIsEditingTitle] = useState(false);
+	const [draftLaneTitle, setDraftLaneTitle] = useState(lane.title);
+	const [isCollapsed, setIsCollapsed] = useState(false);
+	const [editingCardId, setEditingCardId] = useState<string | null>(null);
+	const [draftCardTitle, setDraftCardTitle] = useState('');
+	const isListView = layout === 'list';
+	const isInteractionLocked = editingCardId !== null || isAdding || isEditingTitle;
+	const cardTitleRef = useRef(new Map<string, string>());
+	const isActiveDropTarget = (element: HTMLElement, targets: DragLocation['dropTargets']) =>
+		targets.some((record) => record.element === element);
+	const getCardTarget = (
+		listEl: HTMLUListElement,
+		y: number,
+		draggedEl: HTMLElement,
+	): HTMLElement | null => {
+		const children = Array.from(listEl.querySelectorAll<HTMLElement>('li[data-card-id]'));
+		for (const child of children) {
+			if (child === draggedEl) continue;
+			const rect = child.getBoundingClientRect();
+			if (y < rect.top + rect.height / 2) {
+				return child;
+			}
+		}
+		return null;
+	};
+	const restoreOrder = (container: HTMLElement, order: string[], dataAttr: string) => {
+		const fragment = document.createDocumentFragment();
+		order.forEach((id) => {
+			const el = document.querySelector<HTMLElement>(`[${dataAttr}="${id}"]`);
+			if (el) {
+				fragment.appendChild(el);
+			}
+		});
+		container.appendChild(fragment);
+	};
+
+	useEffect(() => {
+		setDraftLaneTitle(lane.title);
+	}, [lane.title]);
+
+	useEffect(() => {
+		if (!isEditingTitle) return;
+		const input = laneRef.current?.querySelector<HTMLInputElement>(
+			'[data-lane-title-input="true"]',
+		);
+		if (!input) return;
+		window.setTimeout(() => input.focus(), 0);
+	}, [isEditingTitle]);
+
+	useEffect(() => {
+		preventUnhandled.start();
+		return () => preventUnhandled.stop();
+	}, []);
+
+	useEffect(() => {
+		const wrapper = wrapperRef.current;
+		const laneEl = laneRef.current;
+		const handleEl = dragHandleRef.current;
+		if (!wrapper || !laneEl || !handleEl) return;
+
+		return combine(
+			draggable({
+				element: laneEl,
+				dragHandle: handleEl,
+				canDrag: ({ input }) => input.button === 0 && !isInteractionLocked,
+				getInitialData: () => ({ type: 'lane', laneId: lane.id }),
+				onDragStart: () => {
+					laneEl.classList.add('opacity-40');
+					laneOrderRef.current = readLaneOrder(wrapper);
+				},
+				onDrop: ({ location }) => {
+					laneEl.classList.remove('opacity-40');
+					if (location.current.dropTargets.length === 0 && laneOrderRef.current) {
+						restoreOrder(wrapper, laneOrderRef.current, 'data-lane-id');
+					}
+					laneOrderRef.current = null;
+				},
+			}),
+			dropTargetForElements({
+				element: laneEl,
+				canDrop: ({ source }) => isLaneDragData(source.data),
+				onDrag: ({ source, location }) => {
+					if (!isLaneDragData(source.data)) return;
+					if (!isActiveDropTarget(laneEl, location.current.dropTargets)) return;
+					const input = location.current.input;
+					const draggedEl = source.element;
+					if (!draggedEl || draggedEl === laneEl) return;
+					const rect = laneEl.getBoundingClientRect();
+					const insertBefore = isListView
+						? input.clientY < rect.top + rect.height / 2
+						: input.clientX < rect.left + rect.width / 2;
+					const alreadyBefore = laneEl.previousSibling === draggedEl;
+					const alreadyAfter = laneEl.nextSibling === draggedEl;
+					if ((insertBefore && alreadyBefore) || (!insertBefore && alreadyAfter)) return;
+					wrapper.insertBefore(draggedEl, insertBefore ? laneEl : laneEl.nextSibling);
+				},
+				onDrop: ({ source, location }) => {
+					if (!isLaneDragData(source.data)) return;
+					if (!isActiveDropTarget(laneEl, location.current.dropTargets)) return;
+					const order = readLaneOrder(wrapper);
+					void onReorderLanes(order);
+				},
+			}),
+		);
+	}, [lane.id, onReorderLanes, wrapperRef, isInteractionLocked, isListView]);
+
+	useEffect(() => {
+		const listEl = listRef.current;
+		if (!listEl) {
+			cardCleanupRef.current.forEach((cleanup) => cleanup());
+			cardCleanupRef.current.clear();
+			return;
+		}
+
+		if (interactionLockRef.current !== isInteractionLocked) {
+			cardCleanupRef.current.forEach((cleanup) => cleanup());
+			cardCleanupRef.current.clear();
+			interactionLockRef.current = isInteractionLocked;
+		}
+
+		const current = new Set<HTMLElement>();
+		listEl.querySelectorAll<HTMLLIElement>('li[data-card-id]').forEach((cardEl) => {
+			current.add(cardEl);
+			if (cardCleanupRef.current.has(cardEl)) return;
+			const cleanup = combine(
+				draggable({
+					element: cardEl,
+					canDrag: ({ input }) => input.button === 0 && !isInteractionLocked,
+					getInitialData: () => ({
+						type: 'card',
+						cardId: cardEl.dataset.cardId ?? '',
+						fromLaneId: lane.id,
+						fromIndex: Number(cardEl.dataset.index ?? 0),
+					}),
+					onDragStart: () => {
+						cardEl.classList.add('opacity-40');
+						const listEl = listRef.current;
+						if (listEl) {
+							cardOrderRef.current = { listEl, order: readCardOrder(listEl) };
+						}
+					},
+					onDrop: ({ location }) => {
+						cardEl.classList.remove('opacity-40');
+						if (location.current.dropTargets.length === 0 && cardOrderRef.current) {
+							restoreOrder(cardOrderRef.current.listEl, cardOrderRef.current.order, 'data-card-id');
+						}
+						cardOrderRef.current = null;
+					},
+				}),
+			);
+			cardCleanupRef.current.set(cardEl, cleanup);
+		});
+
+		cardCleanupRef.current.forEach((cleanup, el) => {
+			if (!current.has(el)) {
+				cleanup();
+				cardCleanupRef.current.delete(el);
+			}
+		});
+	}, [lane.cards, lane.id, onMoveCard, isCollapsed, isInteractionLocked]);
+
+	useEffect(() => {
+		const listEl = listRef.current;
+		if (!listEl) return;
+		return dropTargetForElements({
+			element: listEl,
+			canDrop: ({ source }) => isCardDragData(source.data) && !isInteractionLocked,
+			onDrag: ({ source, location }) => {
+				if (isInteractionLocked) return;
+				if (!isCardDragData(source.data)) return;
+				if (!isActiveDropTarget(listEl, location.current.dropTargets)) return;
+				const input = location.current.input;
+				const draggedEl = source.element;
+				if (!draggedEl) return;
+				if (draggedEl.parentElement !== listEl) {
+					listEl.appendChild(draggedEl);
+				}
+				const target = getCardTarget(listEl, input.clientY, draggedEl);
+				if (target) {
+					if (target.previousSibling !== draggedEl) {
+						listEl.insertBefore(draggedEl, target);
+					}
+				} else if (listEl.lastElementChild !== draggedEl) {
+					listEl.appendChild(draggedEl);
+				}
+			},
+			onDrop: ({ source, location }) => {
+				if (isInteractionLocked) return;
+				if (!isCardDragData(source.data)) return;
+				if (!isActiveDropTarget(listEl, location.current.dropTargets)) return;
+				const order = readCardOrder(listEl);
+				const index = order.indexOf(source.data.cardId);
+				void onMoveCard(source.data.cardId, lane.id, index === -1 ? listEl.children.length : index);
+			},
+		});
+	}, [lane.id, onMoveCard, isCollapsed, isInteractionLocked]);
+
+	useEffect(() => {
+		const listEl = listRef.current;
+		const laneEl = laneRef.current;
+		if (!laneEl) return;
+		const dropTarget = listEl ?? laneEl;
+		const handleDragOver = (event: DragEvent) => {
+			if (isInteractionLocked) return;
+			const draggable = getObsidianDraggable(markdownContext.app);
+			if (!draggable) return;
+			const links = draggableToLinks(markdownContext.app, markdownContext.sourcePath, draggable);
+			if (links.length === 0) return;
+			event.preventDefault();
+			if (event.dataTransfer) {
+				event.dataTransfer.dropEffect = 'copy';
+			}
+		};
+		const handleDrop = (event: DragEvent) => {
+			if (isInteractionLocked) return;
+			const draggable = getObsidianDraggable(markdownContext.app);
+			if (!draggable) return;
+			const links = draggableToLinks(markdownContext.app, markdownContext.sourcePath, draggable);
+			if (links.length === 0) return;
+			event.preventDefault();
+			links.forEach((link) => {
+				void onAddCard(lane.id, link);
+			});
+		};
+		dropTarget.addEventListener('dragover', handleDragOver);
+		dropTarget.addEventListener('drop', handleDrop);
+		return () => {
+			dropTarget.removeEventListener('dragover', handleDragOver);
+			dropTarget.removeEventListener('drop', handleDrop);
+		};
+	}, [isInteractionLocked, lane.id, markdownContext.app, markdownContext.sourcePath, onAddCard]);
+
+	const submitLaneTitle = async () => {
+		const title = draftLaneTitle.trim();
+		if (!title) return;
+		await onUpdateLaneTitle(lane.id, title);
+		setIsEditingTitle(false);
+	};
+
+	const cancelLaneTitle = () => {
+		setDraftLaneTitle(lane.title);
+		setIsEditingTitle(false);
+	};
+
+	const submitCard = async (nextValue?: string) => {
+		if (isSubmittingCardRef.current) return;
+		const title = (nextValue ?? draftTitle).replace(/\r\n/g, '\n').trim();
+		if (!title) return;
+		isSubmittingCardRef.current = true;
+		try {
+			await onAddCard(lane.id, title);
+			setDraftTitle('');
+			setIsAdding(false);
+		} finally {
+			isSubmittingCardRef.current = false;
+		}
+	};
+
+	const cancelCard = () => {
+		setDraftTitle('');
+		setIsAdding(false);
+	};
+
+	const startEditCard = (cardId: string, title: string) => {
+		setEditingCardId(cardId);
+		setDraftCardTitle(title);
+	};
+
+	const submitCardEdit = async (nextValue?: string) => {
+		if (!editingCardId) return;
+		const title = (nextValue ?? draftCardTitle).replace(/\r\n/g, '\n').trim();
+		if (!title) return;
+		const cardId = editingCardId;
+		await onUpdateCardTitle(cardId, title);
+		setEditingCardId(null);
+		setDraftCardTitle('');
+		cardTitleRef.current.delete(cardId);
+	};
+
+	const cancelCardEdit = (cardId: string, fallbackTitle: string) => {
+		const originalTitle = cardTitleRef.current.get(cardId) ?? fallbackTitle;
+		setDraftCardTitle(originalTitle);
+		setEditingCardId(null);
+		cardTitleRef.current.delete(cardId);
+	};
+
+	const openCardMenu = (event: MouseEvent, cardId: string, title: string) => {
+		event.preventDefault();
+		event.stopPropagation();
+		const menu = new Menu();
+		menu.addItem((item) => {
+			item.setTitle('Edit card').onClick(() => {
+				cardTitleRef.current.set(cardId, title);
+				startEditCard(cardId, title);
+			});
+		});
+		menu.addItem((item) => {
+			item.setTitle('New note from card').onClick(() => {
+				onCreateNoteFromCard(cardId);
+			});
+		});
+		menu.addItem((item) => {
+			item.setTitle('Copy link to card').onClick(() => {
+				onCopyCardLink(cardId);
+				new Notice('Card link copied to clipboard.');
+			});
+		});
+		menu.addItem((item) => {
+			item.setTitle('Create event from card').onClick(() => {
+				onCreateEventFromCard(cardId);
+			});
+		});
+		menu.addSeparator();
+		menu.addItem((item) => {
+			item.setTitle('Delete card').onClick(() => {
+				const ok = window.confirm('Delete this card?');
+				if (!ok) return;
+				void _onRemoveCard(cardId);
+			});
+		});
+		menu.showAtMouseEvent(event);
+	};
+
+	return (
+		<div
+			ref={laneRef}
+			className={
+				isListView
+					? 'w-full max-w-none min-w-0 rounded-lg border border-[var(--background-modifier-border)] bg-[var(--background-primary)] py-2'
+					: 'w-[260px] max-w-[320px] min-w-[260px] flex-none rounded-lg border border-[var(--background-modifier-border)] bg-[var(--background-primary)] py-2'
+			}
+			data-lane-id={lane.id}
+		>
+			<div className="flex items-center gap-1 px-1.5 pb-1">
+				<div
+					ref={dragHandleRef}
+					role="button"
+					tabIndex={0}
+					className="inline-flex cursor-grab items-center justify-center rounded-md p-0.5 text-[color:var(--text-normal)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+					title="Drag to reorder"
+				>
+					<DragIcon className="h-6 w-6" />
+				</div>
+				<div
+					role="button"
+					tabIndex={0}
+					className="inline-flex cursor-pointer items-center justify-center rounded-md p-0.5 text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+					aria-label={isCollapsed ? 'Expand list' : 'Collapse list'}
+					onClick={() => setIsCollapsed((prev) => !prev)}
+				>
+					<ChevronIcon
+						className={
+							isCollapsed
+								? 'h-4 w-4 rotate-180 transition-transform'
+								: 'h-4 w-4 transition-transform'
+						}
+					/>
+				</div>
+				{isEditingTitle ? (
+					<input
+						data-lane-title-input="true"
+						className="h-7 w-full rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-primary)] px-2 text-xs font-semibold tracking-wide text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+						value={draftLaneTitle}
+						onInput={(event) => setDraftLaneTitle(event.currentTarget.value)}
+						onKeyDown={(event) => {
+							if (event.key === 'Enter') {
+								event.preventDefault();
+								void submitLaneTitle();
+							} else if (event.key === 'Escape') {
+								event.preventDefault();
+								cancelLaneTitle();
+							}
+						}}
+					/>
+				) : (
+					<div
+						className="cursor-text text-xs font-semibold tracking-wide text-[color:var(--text-normal)] select-text"
+						onDblClick={() => setIsEditingTitle(true)}
+					>
+						{lane.title}
+					</div>
+				)}
+				<div className="ml-auto flex gap-1">
+					{!isEditingTitle && (
+						<span className="self-center text-xs font-semibold text-[color:var(--text-muted)]">
+							{lane.cards.length}
+						</span>
+					)}
+					{isEditingTitle ? (
+						<>
+							<div
+								role="button"
+								tabIndex={0}
+								className="inline-flex cursor-pointer items-center justify-center rounded-md p-0.5 text-[color:var(--text-normal)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+								aria-label="Save title"
+								onClick={() => void submitLaneTitle()}
+							>
+								<CheckIcon className="h-4 w-4" />
+							</div>
+							<div
+								role="button"
+								tabIndex={0}
+								className="inline-flex cursor-pointer items-center justify-center rounded-md p-0.5 text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+								aria-label="Cancel"
+								onClick={cancelLaneTitle}
+							>
+								<XIcon className="h-4 w-4" />
+							</div>
+						</>
+					) : (
+						<div
+							role="button"
+							tabIndex={0}
+							className="inline-flex cursor-pointer items-center justify-center rounded-md p-0.5 text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+							onClick={() => {
+								const ok = window.confirm(`Remove List "${lane.title}"?`);
+								if (!ok) return;
+								void onRemoveLane(lane.id);
+							}}
+						>
+							<RemoveIcon className="h-4 w-4" />
+						</div>
+					)}
+				</div>
+			</div>
+			<div className="my-1 border-b border-[var(--background-modifier-border)]" />
+			{!isCollapsed && (
+				<ul
+					ref={listRef}
+					className="m-0 flex list-none flex-col gap-2 px-1.5 py-1"
+					data-lane-id={lane.id}
+				>
+					{lane.cards.map((card, index) => (
+						<li
+							key={card.id}
+							className="cursor-grab rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-secondary)] px-3 py-2 text-xs leading-snug break-words whitespace-pre-wrap text-[color:var(--text-normal)] hover:border-[var(--background-modifier-border-hover)] hover:bg-[var(--background-modifier-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+							data-card-id={card.id}
+							data-lane-id={lane.id}
+							data-index={String(index)}
+							onDblClick={() => {
+								cardTitleRef.current.set(card.id, card.title);
+								startEditCard(card.id, card.title);
+							}}
+						>
+							{editingCardId === card.id ? (
+								<CardEditorInput
+									markdownContext={markdownContext}
+									value={draftCardTitle}
+									onChange={setDraftCardTitle}
+									onSubmit={(nextValue) => void submitCardEdit(nextValue)}
+									onCancel={() => cancelCardEdit(card.id, card.title)}
+									containerClassName="flex items-center gap-1.5"
+									inputClassName="h-6 w-full rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-primary)] text-[9px] text-[color:var(--text-normal)] focus-within:outline focus-within:outline-2 focus-within:outline-[var(--text-accent)]"
+									contentStyle={{
+										padding: '4px 8px',
+										lineHeight: '14px',
+										fontSize: '10px',
+									}}
+									buttonSize="sm"
+								/>
+							) : (
+								<div className="relative">
+									<CardTitle title={card.title} markdownContext={markdownContext} />
+									<span
+										role="button"
+										tabIndex={0}
+										className="absolute top-0 right-0 inline-flex h-5 w-5 items-center justify-center rounded-sm text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)]"
+										aria-label="More options"
+										onClick={(event) => openCardMenu(event, card.id, card.title)}
+										onKeyDown={(event) => {
+											if (event.key === 'Enter' || event.key === ' ') {
+												event.preventDefault();
+												openCardMenu(event as unknown as MouseEvent, card.id, card.title);
+											}
+										}}
+									>
+										<MenuIcon size={14} />
+									</span>
+								</div>
+							)}
+						</li>
+					))}
+				</ul>
+			)}
+			{!isCollapsed &&
+				(isAdding ? (
+					<>
+						<div className="my-1 border-b border-[var(--background-modifier-border)]" />
+						<div className="px-1.5">
+							<div className="mt-2 rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-secondary)] px-3 py-2">
+								<CardEditorInput
+									markdownContext={markdownContext}
+									value={draftTitle}
+									onChange={setDraftTitle}
+									onSubmit={(nextValue) => void submitCard(nextValue)}
+									onCancel={cancelCard}
+									placeholder="Card title"
+									containerClassName="flex items-center gap-2"
+									inputClassName="h-6 w-full rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-primary)] text-xs text-[color:var(--text-normal)] focus-within:outline focus-within:outline-2 focus-within:outline-[var(--text-accent)]"
+									actionContainerClassName="flex items-center gap-2"
+									buttonSize="sm"
+									contentStyle={{
+										padding: '4px 10px',
+										lineHeight: '14px',
+										fontSize: '12px',
+									}}
+								/>
+							</div>
+						</div>
+					</>
+				) : (
+					<>
+						<div className="my-1 border-b border-[var(--background-modifier-border)]" />
+						<div className="px-1.5">
+							<button
+								type="button"
+								className="mt-1 inline-flex h-8 w-full items-center justify-center gap-2 rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-secondary)] text-xs font-semibold text-[color:var(--text-normal)] hover:border-[var(--background-modifier-border-hover)] hover:bg-[var(--background-modifier-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+								onClick={() => setIsAdding(true)}
+							>
+								<span className="inline-flex items-center justify-center font-semibold">+</span>
+								<span>Add card</span>
+							</button>
+						</div>
+					</>
+				))}
+		</div>
+	);
+}
