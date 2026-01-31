@@ -43,7 +43,7 @@ const registerCalendarRefresh = (
 type TimelineUIProps = {
 	app: App;
 	calendar: FullNoteCalendar;
-	onOpenNote: (path: string) => void;
+	onOpenNote: (path: string) => Promise<void> | void;
 };
 
 const TimelineRoot = ({ app, calendar, onOpenNote }: TimelineUIProps) => {

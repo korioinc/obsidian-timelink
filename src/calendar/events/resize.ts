@@ -7,7 +7,7 @@ export const createResizeEffectHandlers = (
 	resizeHoverDateKey: string | null,
 	getDateKeyFromPointer: (clientX: number, clientY: number) => string | null,
 	setResizeHoverDateKey: (dateKey: string | null) => void,
-	onSaveEvent: (next: EditableEventResponse, previous: EditableEventResponse) => void,
+	onSaveEvent: (next: EditableEventResponse, previous: EditableEventResponse) => Promise<void> | void,
 	setResizing: (segment: EventSegment | null) => void,
 	isResizingRef: { current: boolean },
 ) => {
@@ -32,7 +32,7 @@ export const createResizeEffectHandlers = (
 		};
 		const previous: EditableEventResponse = [resizing.event, resizing.location];
 		const next: EditableEventResponse = [nextEvent, resizing.location];
-		onSaveEvent(next, previous);
+		void onSaveEvent(next, previous);
 		setResizing(null);
 		setResizeHoverDateKey(null);
 		// Allow a following click to open the modal again after the resize completes.

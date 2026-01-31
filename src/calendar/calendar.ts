@@ -14,18 +14,6 @@ const basenameFromEvent = (event: CalendarEvent): string =>
 
 const filenameForEvent = (event: CalendarEvent) => `${basenameFromEvent(event)}.md`;
 
-const FRONTMATTER_SEPARATOR = '---';
-
-const hasFrontmatter = (page: string): boolean =>
-	page.indexOf(FRONTMATTER_SEPARATOR) === 0 && page.slice(3).indexOf(FRONTMATTER_SEPARATOR) !== -1;
-
-const _extractPageContents = (page: string): string => {
-	if (hasFrontmatter(page)) {
-		return page.split(FRONTMATTER_SEPARATOR).slice(2).join(FRONTMATTER_SEPARATOR);
-	}
-	return page;
-};
-
 type PrintableAtom = Array<number | string> | number | string | boolean;
 
 const stringifyYamlAtom = (value: PrintableAtom): string => {
@@ -87,9 +75,9 @@ export class FullNoteCalendar {
 		return this.directory;
 	}
 
-	async getEventsInFile(file: TFile): Promise<EditableEventResponse[]> {
-		const cache = this.plugin.app.metadataCache.getFileCache(file);
-		const frontmatter = cache?.frontmatter;
+	getEventsInFile(file: TFile): EditableEventResponse[] {
+	const cache = this.plugin.app.metadataCache.getFileCache(file);
+	const frontmatter = cache?.frontmatter;
 		if (!frontmatter) {
 			return [];
 		}
@@ -146,7 +134,7 @@ export class FullNoteCalendar {
 		const events: EditableEventResponse[] = [];
 		for (const file of eventFolder.children) {
 			if (file instanceof TFile) {
-				const results = await this.getEventsInFile(file);
+				const results = this.getEventsInFile(file);
 				events.push(...results);
 			}
 		}

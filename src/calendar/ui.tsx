@@ -47,7 +47,7 @@ export { useCalendarModals } from './modal-manager';
 type CalendarUIProps = {
 	app: App;
 	calendar: FullNoteCalendar;
-	onOpenNote: (path: string) => void;
+	onOpenNote: (path: string) => Promise<void> | void;
 };
 
 const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {

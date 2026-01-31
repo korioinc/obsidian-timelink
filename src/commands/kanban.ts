@@ -19,7 +19,7 @@ export function registerKanbanCommands(plugin: TimeLinkPlugin): void {
 	plugin.addCommand({
 		id: 'create-kanban-board',
 		name: 'Create kanban board',
-		callback: async () => {
+		callback: () => {
 			if (!plugin.settings.enableKanban) {
 				new Notice('Kanban is disabled in settings.');
 				return;

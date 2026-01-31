@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-timelink",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Kanban board, calendar, and timeline views with linked event notes for Obsidian.",
 	"main": "main.js",
 	"type": "module",

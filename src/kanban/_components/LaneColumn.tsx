@@ -88,6 +88,8 @@ const getObsidianDraggable = (app: App): ObsidianDraggable => {
 		?.draggable;
 };
 
+const confirmAction = (message: string): boolean => window.confirm(message);
+
 const draggableToLinks = (app: App, sourcePath: string, draggable: ObsidianDraggable): string[] => {
 	if (!draggable) return [];
 	switch (draggable.type) {
@@ -461,7 +463,7 @@ export function LaneColumn({
 		menu.addSeparator();
 		menu.addItem((item) => {
 			item.setTitle('Delete card').onClick(() => {
-				const ok = window.confirm('Delete this card?');
+				const ok = confirmAction('Delete this card?');
 				if (!ok) return;
 				void _onRemoveCard(cardId);
 			});
@@ -561,7 +563,7 @@ export function LaneColumn({
 							tabIndex={0}
 							className="inline-flex cursor-pointer items-center justify-center rounded-md p-0.5 text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
 							onClick={() => {
-								const ok = window.confirm(`Remove List "${lane.title}"?`);
+								const ok = confirmAction(`Remove List "${lane.title}"?`);
 								if (!ok) return;
 								void onRemoveLane(lane.id);
 							}}
