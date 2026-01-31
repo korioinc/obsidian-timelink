@@ -8,7 +8,7 @@ export interface TimeLinkSettings {
 
 export const DEFAULT_SETTINGS: TimeLinkSettings = {
 	enableKanban: true,
-	calendarFolderPath: 'TimeLink-Calendar',
+	calendarFolderPath: 'Timelink-Calendar',
 };
 
 export class TimeLinkSettingTab extends PluginSettingTab {
