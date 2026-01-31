@@ -707,6 +707,6 @@ export class KanbanView extends TextFileView {
 			return;
 		}
 		this.data = updated;
-		this.requestSave();
+		await Promise.resolve(this.requestSave());
 	}
 }

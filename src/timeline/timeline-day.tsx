@@ -238,7 +238,7 @@ export const TimelineDay = ({
 			endTime: formatTime(normalizedEndMinutes),
 		};
 		const previous = [timedResizing.event, timedResizing.location] as EditableEventResponse;
-		onSaveEvent([nextEvent, timedResizing.location], previous);
+		void onSaveEvent([nextEvent, timedResizing.location], previous);
 	}, [onSaveEvent, timedResizing, timedResizeHoverDateKey, timedResizeHoverMinutes]);
 	const handleTimeGridPointerDown = (event: PointerEvent) => {
 		if (event.button !== 0) return;
@@ -318,7 +318,7 @@ export const TimelineDay = ({
 			startTime: formatTime(startMinutes),
 			endTime: formatTime(endMinutes),
 		};
-		onMoveEvent([updatedEvent, timedDragging.location], previous);
+		void onMoveEvent([updatedEvent, timedDragging.location], previous);
 	};
 
 	const handleTimedResizeStart = (segment: EventSegment, _event: PointerEvent) => {
@@ -451,7 +451,7 @@ export const TimelineDay = ({
 
 	const handleModalDelete = () => {
 		if (!modal) return;
-		onDeleteEvent([modal.segment.event, modal.segment.location]);
+		void onDeleteEvent([modal.segment.event, modal.segment.location]);
 		setModal(null);
 	};
 

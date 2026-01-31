@@ -24,7 +24,7 @@ export class TimeLinkTimelineView extends ItemView {
 	}
 
 	async onOpen(): Promise<void> {
-		await super.onOpen();
+		await Promise.resolve(super.onOpen());
 		const container = this.containerEl.children[1] as HTMLElement | undefined;
 		if (!container) {
 			return;
@@ -41,7 +41,7 @@ export class TimeLinkTimelineView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
-		await super.onClose();
+		await Promise.resolve(super.onClose());
 		const container = this.containerEl.children[1] as HTMLElement | undefined;
 		if (container) {
 			unmountTimelineUI(container);

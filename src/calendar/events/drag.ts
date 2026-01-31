@@ -117,7 +117,10 @@ export const handleDropFactory = (
 	getDragging: () => EventSegment | null,
 	setDragging: (segment: EventSegment | null) => void,
 	setDragHoverDateKey: (dateKey: string | null) => void,
-	onMoveEvent: (next: EditableEventResponse, previous: EditableEventResponse) => void,
+	onMoveEvent: (
+		next: EditableEventResponse,
+		previous: EditableEventResponse,
+	) => Promise<void> | void,
 	didDropRef: { current: boolean },
 ) => {
 	return (dateKey: string) => {

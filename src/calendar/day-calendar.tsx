@@ -318,7 +318,7 @@ export const DayCalendar = ({
 				startTime: timedResizing.event.startTime ?? formatTime(startMinutes),
 			};
 			const previous = [timedResizing.event, timedResizing.location] as EditableEventResponse;
-			onSaveEvent([nextEvent, timedResizing.location], previous);
+			void onSaveEvent([nextEvent, timedResizing.location], previous);
 			setTimedResizing(null);
 			setTimedResizeHoverDateKey(null);
 			setTimedResizeHoverMinutes(null);
@@ -410,7 +410,7 @@ export const DayCalendar = ({
 			startTime: formatTime(startMinutes),
 			endTime: formatTime(endMinutes),
 		};
-		onMoveEvent([updatedEvent, timedDragging.location], previous);
+		void onMoveEvent([updatedEvent, timedDragging.location], previous);
 	};
 
 	const selectionRange = useMemo(
@@ -481,7 +481,7 @@ export const DayCalendar = ({
 
 	const handleModalDelete = () => {
 		if (!modal) return;
-		onDeleteEvent([modal.segment.event, modal.segment.location]);
+		void onDeleteEvent([modal.segment.event, modal.segment.location]);
 		setModal(null);
 	};
 

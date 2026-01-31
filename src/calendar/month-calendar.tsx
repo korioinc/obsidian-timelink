@@ -243,7 +243,7 @@ export const MonthCalendar = ({
 
 	const handleModalDelete = () => {
 		if (!modal) return;
-		onDeleteEvent([modal.segment.event, modal.segment.location]);
+		void onDeleteEvent([modal.segment.event, modal.segment.location]);
 		setModal(null);
 	};
 

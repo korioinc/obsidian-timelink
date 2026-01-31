@@ -175,6 +175,13 @@ const TimelineRoot = ({ app, calendar, onOpenNote }: TimelineUIProps) => {
 		[calendar, suppressReload],
 	);
 
+	const handleCreateEventClick = useCallback(
+		(event: CalendarEvent) => {
+			void handleCreateEvent(event);
+		},
+		[handleCreateEvent],
+	);
+
 	const handlePrev = () => {
 		const next = new Date(currentDate);
 		next.setDate(next.getDate() - 1);
@@ -214,7 +221,7 @@ const TimelineRoot = ({ app, calendar, onOpenNote }: TimelineUIProps) => {
 						onSaveEvent={handleSaveEvent}
 						onDeleteEvent={handleDeleteEvent}
 						onMoveEvent={handleMoveEvent}
-						onCreateEvent={handleCreateEvent}
+						onCreateEvent={handleCreateEventClick}
 						initialDate={currentDate}
 						onDateChange={setCurrentDate}
 					/>

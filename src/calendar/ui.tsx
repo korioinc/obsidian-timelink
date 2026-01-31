@@ -173,6 +173,26 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 		[calendar, updateLocation],
 	);
 
+	const createCalendarEvent = useCallback(
+		async (event: CalendarEvent) => {
+			try {
+				const location = await calendar.createEvent({ ...event, creator: 'calendar' });
+				setEvents((current) => [...current, [event, location]]);
+			} catch (error) {
+				console.error('Failed to create calendar event', error);
+				new Notice('Failed to create the event.');
+			}
+		},
+		[calendar],
+	);
+
+	const handleCreateEvent = useCallback(
+		(event: CalendarEvent) => {
+			void createCalendarEvent(event);
+		},
+		[createCalendarEvent],
+	);
+
 	useEffect(() => {
 		void reloadEvents();
 		return () => {
@@ -224,15 +244,7 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 							onSaveEvent={handleSaveEvent}
 							onDeleteEvent={handleDeleteEvent}
 							onMoveEvent={handleMoveEvent}
-							onCreateEvent={async (event: CalendarEvent) => {
-								try {
-									const location = await calendar.createEvent({ ...event, creator: 'calendar' });
-									setEvents((current) => [...current, [event, location]]);
-								} catch (error) {
-									console.error('Failed to create calendar event', error);
-									new Notice('Failed to create the event.');
-								}
-							}}
+							onCreateEvent={handleCreateEvent}
 							initialDate={currentDate}
 							onDateChange={setCurrentDate}
 						/>
@@ -245,15 +257,7 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 							onSaveEvent={handleSaveEvent}
 							onDeleteEvent={handleDeleteEvent}
 							onMoveEvent={handleMoveEvent}
-							onCreateEvent={async (event: CalendarEvent) => {
-								try {
-									const location = await calendar.createEvent({ ...event, creator: 'calendar' });
-									setEvents((current) => [...current, [event, location]]);
-								} catch (error) {
-									console.error('Failed to create calendar event', error);
-									new Notice('Failed to create the event.');
-								}
-							}}
+							onCreateEvent={handleCreateEvent}
 							initialDate={currentDate}
 							onDateChange={setCurrentDate}
 						/>
@@ -266,15 +270,7 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 							onSaveEvent={handleSaveEvent}
 							onDeleteEvent={handleDeleteEvent}
 							onMoveEvent={handleMoveEvent}
-							onCreateEvent={async (event: CalendarEvent) => {
-								try {
-									const location = await calendar.createEvent({ ...event, creator: 'calendar' });
-									setEvents((current) => [...current, [event, location]]);
-								} catch (error) {
-									console.error('Failed to create calendar event', error);
-									new Notice('Failed to create the event.');
-								}
-							}}
+							onCreateEvent={handleCreateEvent}
 							initialDate={currentDate}
 							onDateChange={setCurrentDate}
 						/>
@@ -287,15 +283,7 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 							onSaveEvent={handleSaveEvent}
 							onDeleteEvent={handleDeleteEvent}
 							onMoveEvent={handleMoveEvent}
-							onCreateEvent={async (event: CalendarEvent) => {
-								try {
-									const location = await calendar.createEvent({ ...event, creator: 'calendar' });
-									setEvents((current) => [...current, [event, location]]);
-								} catch (error) {
-									console.error('Failed to create calendar event', error);
-									new Notice('Failed to create the event.');
-								}
-							}}
+							onCreateEvent={handleCreateEvent}
 							initialDate={currentDate}
 							onDateChange={setCurrentDate}
 						/>

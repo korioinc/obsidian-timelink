@@ -88,13 +88,13 @@ const getObsidianDraggable = (app: App): ObsidianDraggable => {
 		?.draggable;
 };
 
-type ConfirmResult = (value: boolean) => void;
+type ApprovalResult = (value: boolean) => void;
 
-class ConfirmModal extends Modal {
+class ApprovalModal extends Modal {
 	private message: string;
-	private onResolve: ConfirmResult;
+	private onResolve: ApprovalResult;
 
-	constructor(app: App, message: string, onResolve: ConfirmResult) {
+	constructor(app: App, message: string, onResolve: ApprovalResult) {
 		super(app);
 		this.message = message;
 		this.onResolve = onResolve;
@@ -110,8 +110,8 @@ class ConfirmModal extends Modal {
 			this.onResolve(false);
 			this.close();
 		});
-		const confirmButton = actions.createEl('button', { text: 'Confirm', cls: 'mod-cta' });
-		confirmButton.addEventListener('click', () => {
+		const approveButton = actions.createEl('button', { text: 'Confirm', cls: 'mod-cta' });
+		approveButton.addEventListener('click', () => {
 			this.onResolve(true);
 			this.close();
 		});
@@ -123,9 +123,9 @@ class ConfirmModal extends Modal {
 	}
 }
 
-const confirmAction = (app: App, message: string): Promise<boolean> => {
+const requestApproval = (app: App, message: string): Promise<boolean> => {
 	return new Promise((resolve) => {
-		const modal = new ConfirmModal(app, message, resolve);
+		const modal = new ApprovalModal(app, message, resolve);
 		modal.open();
 	});
 };
@@ -504,7 +504,7 @@ export function LaneColumn({
 		menu.addItem((item) => {
 			item.setTitle('Delete card').onClick(() => {
 				void (async () => {
-					const ok = await confirmAction(markdownContext.app, 'Delete this card?');
+					const ok = await requestApproval(markdownContext.app, 'Delete this card?');
 					if (!ok) return;
 					await _onRemoveCard(cardId);
 				})();
@@ -606,7 +606,7 @@ export function LaneColumn({
 							className="inline-flex cursor-pointer items-center justify-center rounded-md p-0.5 text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
 							onClick={() => {
 								void (async () => {
-									const ok = await confirmAction(
+									const ok = await requestApproval(
 										markdownContext.app,
 										`Remove List "${lane.title}"?`,
 									);
