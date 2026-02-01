@@ -25,3 +25,5 @@ data.json
 src/**/*.js
 src/**/*.cjs
 src/**/*.mjs
+
+styles.css
