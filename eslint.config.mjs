@@ -7,6 +7,7 @@ import { globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import tsparser from '@typescript-eslint/parser';
 import tseslint from 'typescript-eslint';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +33,12 @@ export default tseslint.config(
 	...obsidianRecommended,
 	{
 		files: ['**/*.{ts,tsx}'],
+		languageOptions: {
+			parser: tsparser,
+			parserOptions: {
+				tsconfigRootDir: __dirname,
+			},
+		},
 		plugins: {
 			obsidianmd,
 			import: importPlugin,
@@ -39,6 +46,8 @@ export default tseslint.config(
 			promise: pluginPromise,
 		},
 		rules: {
+			'obsidianmd/sample-names': 'off',
+			'obsidianmd/prefer-file-manager-trash-file': 'error',
 			'@microsoft/sdl/no-inner-html': 'off',
 			'no-alert': 'off',
 			'@typescript-eslint/no-unsafe-assignment': 'off',
