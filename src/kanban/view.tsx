@@ -281,6 +281,61 @@ export class KanbanView extends TextFileView {
 		this.render();
 	}
 
+	async applyBoardColorChange(color: string | undefined): Promise<void> {
+		await this.updateBoardSettings({
+			'kanban-color': color ?? undefined,
+		});
+		await this.bulkUpdateLinkedEventColors(color ?? undefined);
+	}
+
+	private async bulkUpdateLinkedEventColors(color: string | undefined): Promise<void> {
+		if (!this.board || !this.file) return;
+		const eventFiles = new Set<TFile>();
+		for (const lane of this.board.lanes) {
+			for (const card of lane.cards) {
+				const { titleLine } = this.getTitleParts(card.title);
+				const linkedPath = this.getFirstWikiLinkPath(titleLine);
+				if (!linkedPath) continue;
+				const linkedCardFile = this.app.metadataCache.getFirstLinkpathDest(
+					linkedPath,
+					this.file.path,
+				);
+				if (!linkedCardFile || !(linkedCardFile instanceof TFile)) continue;
+				const frontmatter = this.app.metadataCache.getFileCache(linkedCardFile)?.frontmatter as
+					| Record<string, unknown>
+					| undefined;
+				const eventLinkValue = frontmatter?.[KanbanView.CARD_EVENT_PROPERTY];
+				if (typeof eventLinkValue !== 'string' || !eventLinkValue.trim()) continue;
+				const eventPath = this.getFirstWikiLinkPath(eventLinkValue);
+				if (!eventPath) continue;
+				const eventFile = this.app.metadataCache.getFirstLinkpathDest(
+					eventPath,
+					linkedCardFile.path,
+				);
+				if (eventFile && eventFile instanceof TFile) {
+					eventFiles.add(eventFile);
+				}
+			}
+		}
+
+		const normalized = normalizeHexColor(color) ?? undefined;
+		for (const eventFile of eventFiles) {
+			await this.app.fileManager.processFrontMatter(
+				eventFile,
+				(frontmatter: Record<string, unknown>) => {
+					if (normalized) {
+						frontmatter.color = normalized;
+					} else {
+						delete frontmatter.color;
+					}
+				},
+			);
+		}
+		if (eventFiles.size > 0) {
+			new Notice(`Updated ${eventFiles.size} linked event${eventFiles.size === 1 ? '' : 's'}.`);
+		}
+	}
+
 	openAddLaneForm(): void {
 		const anchor = this.actionButtons['add-list'];
 		this.addLaneAnchorRect = anchor?.getBoundingClientRect() ?? null;
