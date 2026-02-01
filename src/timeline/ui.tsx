@@ -182,6 +182,16 @@ const TimelineRoot = ({ app, calendar, onOpenNote }: TimelineUIProps) => {
 		[handleCreateEvent],
 	);
 
+	const handleOpenNote = useCallback(
+		(path: string) => {
+			Promise.resolve(onOpenNote(path)).catch((error) => {
+				console.error('Failed to open the note', error);
+				new Notice('Failed to open the note.');
+			});
+		},
+		[onOpenNote],
+	);
+
 	const handlePrev = () => {
 		const next = new Date(currentDate);
 		next.setDate(next.getDate() - 1);
@@ -217,7 +227,7 @@ const TimelineRoot = ({ app, calendar, onOpenNote }: TimelineUIProps) => {
 					<TimelineDay
 						app={app}
 						events={events}
-						onOpenNote={onOpenNote}
+						onOpenNote={handleOpenNote}
 						onSaveEvent={handleSaveEvent}
 						onDeleteEvent={handleDeleteEvent}
 						onMoveEvent={handleMoveEvent}

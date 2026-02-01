@@ -124,10 +124,18 @@ class ApprovalModal extends Modal {
 }
 
 const requestApproval = (app: App, message: string): Promise<boolean> => {
-	return new Promise((resolve) => {
-		const modal = new ApprovalModal(app, message, resolve);
-		modal.open();
-	});
+	const { promise, resolve } = (
+		Promise as typeof Promise & {
+			withResolvers: <T>() => {
+				promise: Promise<T>;
+				resolve: (value: T | PromiseLike<T>) => void;
+				reject: (reason?: unknown) => void;
+			};
+		}
+	).withResolvers<boolean>();
+	const modal = new ApprovalModal(app, message, resolve);
+	modal.open();
+	return promise;
 };
 
 const draggableToLinks = (app: App, sourcePath: string, draggable: ObsidianDraggable): string[] => {

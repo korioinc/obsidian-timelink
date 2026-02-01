@@ -138,7 +138,7 @@ export const handleDropFactory = (
 		const original: EditableEventResponse = [dragging.event, dragging.location];
 		const next = clampEventDate(dragging.event, offset);
 		const updated: EditableEventResponse = [next, dragging.location];
-		onMoveEvent(updated, original);
+		void onMoveEvent(updated, original);
 		setDragging(null);
 		setDragHoverDateKey(null);
 	};

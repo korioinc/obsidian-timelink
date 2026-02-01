@@ -7,7 +7,10 @@ export const createResizeEffectHandlers = (
 	resizeHoverDateKey: string | null,
 	getDateKeyFromPointer: (clientX: number, clientY: number) => string | null,
 	setResizeHoverDateKey: (dateKey: string | null) => void,
-	onSaveEvent: (next: EditableEventResponse, previous: EditableEventResponse) => Promise<void> | void,
+	onSaveEvent: (
+		next: EditableEventResponse,
+		previous: EditableEventResponse,
+	) => Promise<void> | void,
 	setResizing: (segment: EventSegment | null) => void,
 	isResizingRef: { current: boolean },
 ) => {

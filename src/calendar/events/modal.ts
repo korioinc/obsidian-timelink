@@ -3,7 +3,10 @@ import type { CalendarEvent, CreateEventState, EventModalState, EventSegment } f
 import { normalizeHexColor } from '../utils/month-calendar-utils';
 
 export const handleToggleCompletedFactory = (
-	onSaveEvent: (next: EditableEventResponse, previous: EditableEventResponse) => Promise<void> | void,
+	onSaveEvent: (
+		next: EditableEventResponse,
+		previous: EditableEventResponse,
+	) => Promise<void> | void,
 ) => {
 	return (segment: EventSegment) => {
 		if (!segment.event.taskEvent) return;
@@ -73,7 +76,10 @@ export const handleDateClickFactory = (
 
 export const handleModalSaveFactory = (
 	getModal: () => EventModalState | null,
-	onSaveEvent: (next: EditableEventResponse, previous: EditableEventResponse) => Promise<void> | void,
+	onSaveEvent: (
+		next: EditableEventResponse,
+		previous: EditableEventResponse,
+	) => Promise<void> | void,
 	setModal: (next: EventModalState | null) => void,
 	notice: (message: string) => void,
 ) => {

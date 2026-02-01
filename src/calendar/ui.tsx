@@ -193,6 +193,16 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 		[createCalendarEvent],
 	);
 
+	const handleOpenNote = useCallback(
+		(path: string) => {
+			Promise.resolve(onOpenNote(path)).catch((error) => {
+				console.error('Failed to open the note', error);
+				new Notice('Failed to open the note.');
+			});
+		},
+		[onOpenNote],
+	);
+
 	useEffect(() => {
 		void reloadEvents();
 		return () => {
@@ -240,7 +250,7 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 						<MonthCalendar
 							app={app}
 							events={events}
-							onOpenNote={onOpenNote}
+							onOpenNote={handleOpenNote}
 							onSaveEvent={handleSaveEvent}
 							onDeleteEvent={handleDeleteEvent}
 							onMoveEvent={handleMoveEvent}
@@ -253,7 +263,7 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 						<WeekCalendar
 							app={app}
 							events={events}
-							onOpenNote={onOpenNote}
+							onOpenNote={handleOpenNote}
 							onSaveEvent={handleSaveEvent}
 							onDeleteEvent={handleDeleteEvent}
 							onMoveEvent={handleMoveEvent}
@@ -266,7 +276,7 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 						<DayCalendar
 							app={app}
 							events={events}
-							onOpenNote={onOpenNote}
+							onOpenNote={handleOpenNote}
 							onSaveEvent={handleSaveEvent}
 							onDeleteEvent={handleDeleteEvent}
 							onMoveEvent={handleMoveEvent}
@@ -279,7 +289,7 @@ const CalendarRoot = ({ app, calendar, onOpenNote }: CalendarUIProps) => {
 						<ListCalendar
 							app={app}
 							events={events}
-							onOpenNote={onOpenNote}
+							onOpenNote={handleOpenNote}
 							onSaveEvent={handleSaveEvent}
 							onDeleteEvent={handleDeleteEvent}
 							onMoveEvent={handleMoveEvent}
