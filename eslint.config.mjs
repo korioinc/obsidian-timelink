@@ -1,3 +1,4 @@
+import tsparser from '@typescript-eslint/parser';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import obsidianmd from 'eslint-plugin-obsidianmd';
@@ -7,12 +8,10 @@ import { globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import tsparser from '@typescript-eslint/parser';
 import tseslint from 'typescript-eslint';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const obsidianRecommended = obsidianmd.configs?.recommended ?? [];
 
 export default tseslint.config(
 	{
@@ -30,7 +29,7 @@ export default tseslint.config(
 			},
 		},
 	},
-	...obsidianRecommended,
+	...obsidianmd.configs.recommended,
 	{
 		files: ['**/*.{ts,tsx}'],
 		languageOptions: {
@@ -46,36 +45,16 @@ export default tseslint.config(
 			promise: pluginPromise,
 		},
 		rules: {
-			'obsidianmd/sample-names': 'off',
-			'obsidianmd/prefer-file-manager-trash-file': 'error',
-			'@microsoft/sdl/no-inner-html': 'off',
-			'no-alert': 'off',
-			'@typescript-eslint/no-unsafe-assignment': 'off',
-			'@typescript-eslint/no-unused-vars': [
-				'warn',
-				{ argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-			],
-			'@typescript-eslint/no-misused-promises': ['warn', { checksVoidReturn: false }],
-			'@typescript-eslint/no-floating-promises': 'warn',
-			'obsidianmd/ui/sentence-case': 'warn',
-			'import/order': 'off',
-			'promise/catch-or-return': 'warn',
-			'promise/always-return': 'off',
-			'promise/no-nesting': 'warn',
-			'promise/no-return-wrap': 'warn',
-			'promise/param-names': 'warn',
-			'promise/no-promise-in-callback': 'warn',
-			'promise/no-callback-in-promise': 'warn',
-			'promise/avoid-new': 'warn',
-			'promise/no-new-statics': 'warn',
-			'promise/no-return-in-finally': 'warn',
-			'prettier/prettier': 'warn',
+			'prettier/prettier': 'error',
 		},
 	},
 	{
-		files: ['src/calendar/utils/**/__tests__/*.test.ts', 'src/calendar/utils/*.test.ts'],
+		files: ['**/*.{js,mjs,cjs}'],
+		plugins: {
+			prettier,
+		},
 		rules: {
-			'import/no-nodejs-modules': 'off',
+			'prettier/prettier': 'error',
 		},
 	},
 	{
@@ -94,6 +73,5 @@ export default tseslint.config(
 		'versions.json',
 		'main.js',
 		'styles.css',
-		'tmp-plugins',
 	]),
 );

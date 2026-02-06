@@ -40,7 +40,10 @@ const parseFrontmatterValue = (frontmatterBody: string, key: string): string | u
 };
 
 const getKanbanColorFromCache = (app: App, file: TFile): string | undefined => {
-	const raw = app.metadataCache.getFileCache(file)?.frontmatter?.[KANBAN_BOARD_COLOR_KEY];
+	const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter as
+		| Record<string, unknown>
+		| undefined;
+	const raw: unknown = frontmatter?.[KANBAN_BOARD_COLOR_KEY];
 	if (typeof raw !== 'string') return undefined;
 	return normalizeHexColor(raw) ?? undefined;
 };

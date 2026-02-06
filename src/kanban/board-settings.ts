@@ -79,7 +79,8 @@ export function hasBoardSettingsOverrides(settings: KanbanBoardSettings): boolea
 
 export function parseBoardSettingsFooter(markdown: string): KanbanBoardSettings {
 	const settings = extractSettingsFooter(markdown);
-	const { ['kanban-color']: _ignoredColor, ...withoutColor } = settings;
+	const withoutColor: Partial<KanbanBoardSettings> = { ...settings };
+	delete withoutColor['kanban-color'];
 	return normalizeBoardSettings(withoutColor);
 }
 

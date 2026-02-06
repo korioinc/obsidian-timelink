@@ -213,8 +213,14 @@ const parseCardDragPayload = (
 		})();
 	if (!raw) {
 		if (!activeCardDrag) return null;
-		const { handled: _handled, ...payload } = activeCardDrag;
-		return payload;
+		return {
+			sourceBoardPath: activeCardDrag.sourceBoardPath,
+			cardId: activeCardDrag.cardId,
+			fromLaneId: activeCardDrag.fromLaneId,
+			fromIndex: activeCardDrag.fromIndex,
+			title: activeCardDrag.title,
+			blockId: activeCardDrag.blockId,
+		};
 	}
 	try {
 		const parsed = JSON.parse(raw) as Partial<CrossBoardCardMovePayload>;

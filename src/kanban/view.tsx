@@ -454,9 +454,10 @@ export class KanbanView extends TextFileView {
 
 	private getBoardColorFromMetadata(): string | undefined {
 		if (!this.file) return undefined;
-		const raw = this.app.metadataCache.getFileCache(this.file)?.frontmatter?.[
-			KanbanView.BOARD_COLOR_PROPERTY
-		];
+		const frontmatter = this.app.metadataCache.getFileCache(this.file)?.frontmatter as
+			| Record<string, unknown>
+			| undefined;
+		const raw: unknown = frontmatter?.[KanbanView.BOARD_COLOR_PROPERTY];
 		if (typeof raw !== 'string') return undefined;
 		return normalizeHexColor(raw) ?? undefined;
 	}
@@ -567,8 +568,10 @@ export class KanbanView extends TextFileView {
 		if (!titleLine) return false;
 		const linkedCardFile = this.getLinkedCardFile(titleLine);
 		if (!linkedCardFile) return false;
-		const frontmatter = this.app.metadataCache.getFileCache(linkedCardFile)?.frontmatter;
-		const linkedEvent = frontmatter?.[KanbanView.CARD_EVENT_PROPERTY];
+		const frontmatter = this.app.metadataCache.getFileCache(linkedCardFile)?.frontmatter as
+			| Record<string, unknown>
+			| undefined;
+		const linkedEvent: unknown = frontmatter?.[KanbanView.CARD_EVENT_PROPERTY];
 		return typeof linkedEvent === 'string' && linkedEvent.trim().length > 0;
 	}
 
@@ -797,8 +800,10 @@ export class KanbanView extends TextFileView {
 		if (eventPath) {
 			const eventFile = this.app.metadataCache.getFirstLinkpathDest(eventPath, this.file.path);
 			if (eventFile && eventFile instanceof TFile) {
-				const frontmatter = this.app.metadataCache.getFileCache(eventFile)?.frontmatter;
-				const cardLink = frontmatter?.[KanbanView.EVENT_CARD_PROPERTY];
+				const frontmatter = this.app.metadataCache.getFileCache(eventFile)?.frontmatter as
+					| Record<string, unknown>
+					| undefined;
+				const cardLink: unknown = frontmatter?.[KanbanView.EVENT_CARD_PROPERTY];
 				if (typeof cardLink === 'string' && cardLink.trim()) {
 					await navigator.clipboard.writeText(cardLink.trim());
 					return;
