@@ -205,6 +205,7 @@ const WeekAllDayCell = ({
 							dateKey={cell.key}
 							isToday={today}
 							isPressed={pressed}
+							showTodayBorder={true}
 							className="relative flex h-full min-h-0 flex-col overflow-hidden"
 							onClick={() => onDateClick(cell.key)}
 							onPointerDown={() => onSelectionStart(cell.key)}

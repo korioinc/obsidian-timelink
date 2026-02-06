@@ -1,12 +1,14 @@
 import { normalizeHexColor } from '../calendar/utils/month-calendar-utils';
 import type TimeLinkPlugin from '../main';
 import { KanbanRoot } from './_components/KanbanRoot';
+import type { CrossBoardCardMovePayload } from './_components/LaneColumn';
 import { KanbanBoardSettings, normalizeBoardSettings } from './board-settings';
 import { KANBAN_ICON, KANBAN_VIEW_TYPE } from './constants';
 import { openBoardSettingsModal } from './modal';
 import {
 	addCard,
 	addLane,
+	insertCardAt,
 	isKanbanBoard,
 	KanbanBoard,
 	moveCard,
@@ -29,8 +31,10 @@ export class KanbanView extends TextFileView {
 	private isAddLaneFormOpen = false;
 	private addLaneAnchorRect: DOMRect | null = null;
 	private cardTitleById = new Map<string, string>();
+	private cardHasEventById = new Map<string, boolean>();
 	private static readonly CARD_EVENT_PROPERTY = 'timelinkEvent';
 	private static readonly EVENT_CARD_PROPERTY = 'timelinkCard';
+	private static readonly BOARD_COLOR_PROPERTY = 'kanban-color';
 
 	constructor(leaf: WorkspaceLeaf, plugin: TimeLinkPlugin) {
 		super(leaf);
@@ -282,10 +286,41 @@ export class KanbanView extends TextFileView {
 	}
 
 	async applyBoardColorChange(color: string | undefined): Promise<void> {
-		await this.updateBoardSettings({
-			'kanban-color': color ?? undefined,
-		});
-		await this.bulkUpdateLinkedEventColors(color ?? undefined);
+		if (!this.file) {
+			new Notice('Kanban board file not found.');
+			return;
+		}
+		const normalized = normalizeHexColor(color) ?? undefined;
+		try {
+			await this.app.fileManager.processFrontMatter(
+				this.file,
+				(frontmatter: Record<string, unknown>) => {
+					if (normalized) {
+						frontmatter[KanbanView.BOARD_COLOR_PROPERTY] = normalized;
+					} else {
+						delete frontmatter[KanbanView.BOARD_COLOR_PROPERTY];
+					}
+				},
+			);
+		} catch (error) {
+			console.error('Failed to update board color', error);
+			new Notice('Failed to update board color.');
+			return;
+		}
+
+		if (this.board) {
+			this.board = {
+				...this.board,
+				settings: normalizeBoardSettings({
+					...this.board.settings,
+					'kanban-color': normalized,
+				}),
+			};
+		}
+		this.updateHeaderButtonsVisibility();
+		this.updateBoardColorIndicator();
+		this.render();
+		await this.bulkUpdateLinkedEventColors(normalized);
 	}
 
 	private async bulkUpdateLinkedEventColors(color: string | undefined): Promise<void> {
@@ -417,6 +452,39 @@ export class KanbanView extends TextFileView {
 		return this.data ?? '';
 	}
 
+	private getBoardColorFromMetadata(): string | undefined {
+		if (!this.file) return undefined;
+		const raw = this.app.metadataCache.getFileCache(this.file)?.frontmatter?.[
+			KanbanView.BOARD_COLOR_PROPERTY
+		];
+		if (typeof raw !== 'string') return undefined;
+		return normalizeHexColor(raw) ?? undefined;
+	}
+
+	private getBoardColorFromMarkdown(markdown: string): string | undefined {
+		const normalized = markdown.replace(/\r\n/g, '\n');
+		const frontmatterMatch = normalized.match(/^---\n([\s\S]*?)\n---/);
+		if (!frontmatterMatch?.[1]) return undefined;
+		const lines = frontmatterMatch[1].split('\n');
+		for (const line of lines) {
+			const match = line.match(/^\s*kanban-color\s*:\s*(.+?)\s*$/i);
+			if (!match?.[1]) continue;
+			let value = match[1].trim();
+			const quoted =
+				(value.startsWith('"') && value.endsWith('"')) ||
+				(value.startsWith("'") && value.endsWith("'"));
+			if (quoted && value.length >= 2) {
+				value = value.slice(1, -1).trim();
+			}
+			return normalizeHexColor(value) ?? undefined;
+		}
+		return undefined;
+	}
+
+	private resolveBoardColor(markdown: string): string | undefined {
+		return this.getBoardColorFromMetadata() ?? this.getBoardColorFromMarkdown(markdown);
+	}
+
 	setViewData(data: string, clear: boolean): void {
 		if (clear) {
 			this.board = null;
@@ -430,7 +498,15 @@ export class KanbanView extends TextFileView {
 			return;
 		}
 		this.data = data;
-		this.board = parseKanbanBoard(data);
+		const parsedBoard = parseKanbanBoard(data);
+		const boardColor = this.resolveBoardColor(data);
+		this.board = {
+			...parsedBoard,
+			settings: normalizeBoardSettings({
+				...parsedBoard.settings,
+				'kanban-color': boardColor,
+			}),
+		};
 		this.updateHeaderButtonsVisibility();
 		this.updateBoardColorIndicator();
 		this.render();
@@ -446,6 +522,11 @@ export class KanbanView extends TextFileView {
 		this.cardTitleById = new Map(
 			this.board?.lanes.flatMap((lane) => lane.cards.map((card) => [card.id, card.title])) ?? [],
 		);
+		this.cardHasEventById = new Map(
+			this.board?.lanes.flatMap((lane) =>
+				lane.cards.map((card) => [card.id, this.hasCardLinkedEvent(card.title)] as const),
+			) ?? [],
+		);
 		const boardSettings = this.board?.settings ?? {};
 		render(
 			<KanbanRoot
@@ -460,6 +541,7 @@ export class KanbanView extends TextFileView {
 				showAddLaneForm={this.isAddLaneFormOpen}
 				addLaneAnchorRect={this.addLaneAnchorRect}
 				addLaneAnchorEl={this.actionButtons['add-list']}
+				cardHasEventById={this.cardHasEventById}
 				onCloseAddLaneForm={() => this.closeAddLaneForm()}
 				onAddLane={(title) => this.handleAddLane(title)}
 				onCreateNoteFromCard={(cardId) => void this.handleCreateNoteFromCard(cardId)}
@@ -472,9 +554,22 @@ export class KanbanView extends TextFileView {
 				onRemoveCard={(cardId) => this.handleRemoveCard(cardId)}
 				onUpdateCardTitle={(cardId, title) => this.handleUpdateCardTitle(cardId, title)}
 				onMoveCard={(cardId, laneId, index) => this.handleMoveCard(cardId, laneId, index)}
+				onMoveCardFromOtherBoard={(payload, laneId, index) =>
+					this.handleMoveCardFromOtherBoard(payload, laneId, index)
+				}
 			/>,
 			this.contentEl,
 		);
+	}
+
+	private hasCardLinkedEvent(title: string): boolean {
+		const { titleLine } = this.getTitleParts(title);
+		if (!titleLine) return false;
+		const linkedCardFile = this.getLinkedCardFile(titleLine);
+		if (!linkedCardFile) return false;
+		const frontmatter = this.app.metadataCache.getFileCache(linkedCardFile)?.frontmatter;
+		const linkedEvent = frontmatter?.[KanbanView.CARD_EVENT_PROPERTY];
+		return typeof linkedEvent === 'string' && linkedEvent.trim().length > 0;
 	}
 
 	async handleAddLane(title: string): Promise<void> {
@@ -745,6 +840,84 @@ export class KanbanView extends TextFileView {
 			next += alphabet[Math.floor(Math.random() * alphabet.length)];
 		}
 		return next;
+	}
+
+	private hasCard(board: KanbanBoard, cardId: string): boolean {
+		return board.lanes.some((lane) => lane.cards.some((card) => card.id === cardId));
+	}
+
+	private findOpenKanbanViewByPath(filePath: string): KanbanView | null {
+		const leaves = this.app.workspace.getLeavesOfType(KANBAN_VIEW_TYPE);
+		for (const leaf of leaves) {
+			const view = leaf.view;
+			if (!(view instanceof KanbanView)) continue;
+			const state = leaf.getViewState().state as { file?: string; filePath?: string } | undefined;
+			const currentPath = view.file?.path ?? state?.file ?? state?.filePath;
+			if (currentPath === filePath) {
+				return view;
+			}
+		}
+		return null;
+	}
+
+	private async removeCardForExternalMove(cardId: string): Promise<boolean> {
+		if (!this.board) return false;
+		if (!this.hasCard(this.board, cardId)) return false;
+		this.board = removeCard(this.board, cardId);
+		await this.persist();
+		this.render();
+		return true;
+	}
+
+	private async removeCardFromBoardFile(filePath: string, cardId: string): Promise<boolean> {
+		const sourceFile = this.app.vault.getAbstractFileByPath(filePath);
+		if (!(sourceFile instanceof TFile)) return false;
+		const markdown = await this.app.vault.read(sourceFile);
+		if (!isKanbanBoard(markdown)) return false;
+		const sourceBoard = parseKanbanBoard(markdown);
+		if (!this.hasCard(sourceBoard, cardId)) return false;
+		const nextBoard = removeCard(sourceBoard, cardId);
+		const serialized = serializeKanbanBoard(nextBoard, markdown);
+		await this.app.vault.modify(sourceFile, serialized);
+		return true;
+	}
+
+	private async removeCardFromSourceBoard(
+		sourceBoardPath: string,
+		cardId: string,
+	): Promise<boolean> {
+		const sourceView = this.findOpenKanbanViewByPath(sourceBoardPath);
+		if (sourceView) {
+			return sourceView.removeCardForExternalMove(cardId);
+		}
+		return this.removeCardFromBoardFile(sourceBoardPath, cardId);
+	}
+
+	async handleMoveCardFromOtherBoard(
+		payload: CrossBoardCardMovePayload,
+		laneId: string,
+		index: number,
+	): Promise<void> {
+		if (!this.board || !this.file) return;
+		if (payload.sourceBoardPath === this.file.path) {
+			await this.handleMoveCard(payload.cardId, laneId, index);
+			return;
+		}
+		if (!this.board.lanes.some((lane) => lane.id === laneId)) return;
+		const normalizedTitle = payload.title.replace(/\r\n/g, '\n').trim();
+		if (!normalizedTitle) return;
+
+		this.board = insertCardAt(this.board, laneId, index, {
+			title: normalizedTitle,
+			blockId: payload.blockId,
+		});
+		await this.persist();
+		this.render();
+
+		const removed = await this.removeCardFromSourceBoard(payload.sourceBoardPath, payload.cardId);
+		if (!removed) {
+			new Notice('Card moved, but source card removal failed. Remove it manually if duplicated.');
+		}
 	}
 
 	async handleMoveCard(cardId: string, laneId: string, index: number): Promise<void> {

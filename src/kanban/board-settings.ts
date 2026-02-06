@@ -63,9 +63,6 @@ export function normalizeBoardSettings(
 
 export function getBoardSettingsOverrides(settings: KanbanBoardSettings): KanbanBoardSettings {
 	const overrides: KanbanBoardSettings = {};
-	if (typeof settings['kanban-color'] === 'string' && settings['kanban-color'].trim()) {
-		overrides['kanban-color'] = settings['kanban-color'];
-	}
 
 	if (settings['show-board-color'] === false) overrides['show-board-color'] = false;
 	if (settings['show-add-list'] === false) overrides['show-add-list'] = false;
@@ -82,7 +79,8 @@ export function hasBoardSettingsOverrides(settings: KanbanBoardSettings): boolea
 
 export function parseBoardSettingsFooter(markdown: string): KanbanBoardSettings {
 	const settings = extractSettingsFooter(markdown);
-	return normalizeBoardSettings(settings);
+	const { ['kanban-color']: _ignoredColor, ...withoutColor } = settings;
+	return normalizeBoardSettings(withoutColor);
 }
 
 function extractSettingsFooter(markdown: string): Partial<KanbanBoardSettings> {

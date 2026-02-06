@@ -1,6 +1,12 @@
 import type { EditableEventResponse } from '../calendar';
 import type { CalendarEvent, CreateEventState, EventModalState, EventSegment } from '../types';
-import { normalizeHexColor } from '../utils/month-calendar-utils';
+import { compareDateKey, normalizeHexColor } from '../utils/month-calendar-utils';
+
+const normalizeEventEndDate = (startDate: string, endDate?: string | null): string | undefined => {
+	if (!endDate) return undefined;
+	const normalized = compareDateKey(endDate, startDate) < 0 ? startDate : endDate;
+	return normalized === startDate ? undefined : normalized;
+};
 
 export const handleToggleCompletedFactory = (
 	onSaveEvent: (
@@ -110,12 +116,13 @@ export const handleModalSaveFactory = (
 		const previous: EditableEventResponse = [modal.segment.event, modal.segment.location];
 		const completed = draft.taskEvent ? draft.isCompleted : false;
 		const normalizedColor = normalizeHexColor(draft.color);
+		const normalizedEndDate = normalizeEventEndDate(draft.date, modal.segment.event.endDate);
 		const nextEvent: CalendarEvent = {
 			...modal.segment.event,
 			title: draft.title,
 			allDay: draft.allDay,
 			date: draft.date,
-			endDate: modal.segment.event.endDate,
+			endDate: normalizedEndDate,
 			startDate: modal.segment.event.startDate,
 			taskEvent: draft.taskEvent,
 			completed,
@@ -165,14 +172,13 @@ export const handleCreateSaveFactory = (
 			}
 		}
 		const normalizedColor = normalizeHexColor(draft.color);
+		const normalizedEndDate = normalizeEventEndDate(draft.date, createModal.endDate);
 		const nextEvent: CalendarEvent = {
 			title: draft.title,
 			allDay: draft.allDay,
 			date: draft.date,
 			taskEvent: draft.taskEvent,
-			...(createModal.endDate && createModal.endDate !== draft.date
-				? { endDate: createModal.endDate }
-				: {}),
+			...(normalizedEndDate ? { endDate: normalizedEndDate } : {}),
 			...(draft.taskEvent ? { completed: draft.isCompleted } : {}),
 			...(normalizedColor ? { color: normalizedColor } : {}),
 		};

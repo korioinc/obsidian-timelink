@@ -3,11 +3,13 @@ import { CALENDAR_VIEW_TYPE } from './calendar/constants';
 import { formatDateKey } from './calendar/utils/month-calendar-utils';
 import { TimeLinkCalendarView } from './calendar/view';
 import { registerKanbanCommands } from './commands/kanban';
+import { KANBAN_LIST_VIEW_ICON, KANBAN_LIST_VIEW_TYPE } from './kanban-list/constants';
+import { TimeLinkKanbanListView } from './kanban-list/view';
 import {
 	KANBAN_FRONTMATTER_KEY,
 	KANBAN_FRONTMATTER_VALUE,
-	KANBAN_VIEW_TYPE,
 	KANBAN_ICON,
+	KANBAN_VIEW_TYPE,
 } from './kanban/constants';
 import { KanbanManager } from './kanban/manager';
 import { openCreateKanbanModal } from './kanban/modal';
@@ -15,7 +17,7 @@ import { DEFAULT_SETTINGS, TimeLinkSettingTab, TimeLinkSettings } from './settin
 import { TIMELINE_VIEW_ICON, TIMELINE_VIEW_TYPE } from './timeline/constants';
 import { TimeLinkTimelineView } from './timeline/view';
 import { around } from './utils/around';
-import { Menu, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, MarkdownView } from 'obsidian';
+import { MarkdownView, Menu, Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from 'obsidian';
 
 export default class TimeLinkPlugin extends Plugin {
 	settings: TimeLinkSettings;
@@ -24,6 +26,7 @@ export default class TimeLinkPlugin extends Plugin {
 	private kanbanMarkdownModes = new Map<string, 'readonly' | 'editing'>();
 	private kanbanLeafFilePaths = new Map<string, string>();
 	private kanbanRibbonIcon: HTMLElement | null = null;
+	private kanbanListRibbonIcon: HTMLElement | null = null;
 	getTodayDateKey(): string {
 		return formatDateKey(new Date());
 	}
@@ -33,6 +36,7 @@ export default class TimeLinkPlugin extends Plugin {
 
 		this.registerView(CALENDAR_VIEW_TYPE, (leaf) => new TimeLinkCalendarView(leaf, this));
 		this.registerView(TIMELINE_VIEW_TYPE, (leaf) => new TimeLinkTimelineView(leaf, this));
+		this.registerView(KANBAN_LIST_VIEW_TYPE, (leaf) => new TimeLinkKanbanListView(leaf, this));
 
 		this.registerExtensions(['kanban'], 'markdown');
 
@@ -211,6 +215,22 @@ export default class TimeLinkPlugin extends Plugin {
 		void this.app.workspace.revealLeaf(leaf);
 	}
 
+	private async openKanbanListView(): Promise<void> {
+		const leaves = this.app.workspace.getLeavesOfType(KANBAN_LIST_VIEW_TYPE);
+		const existingLeaf = leaves[0];
+		if (existingLeaf) {
+			void this.app.workspace.revealLeaf(existingLeaf);
+			return;
+		}
+		const leaf = this.app.workspace.getLeaf('tab') ?? this.app.workspace.getRightLeaf(false);
+		if (!leaf) {
+			new Notice('Unable to open kanban list view.');
+			return;
+		}
+		await leaf.setViewState({ type: KANBAN_LIST_VIEW_TYPE, active: true });
+		void this.app.workspace.revealLeaf(leaf);
+	}
+
 	private async initTimelineLeafSilently(): Promise<void> {
 		const leaves = this.app.workspace.getLeavesOfType(TIMELINE_VIEW_TYPE);
 		if (leaves.length > 0) {
@@ -232,6 +252,7 @@ export default class TimeLinkPlugin extends Plugin {
 		this.kanbanMarkdownModes.clear();
 		this.kanbanLeafFilePaths.clear();
 		this.removeKanbanRibbonIcon();
+		this.removeKanbanListRibbonIcon();
 	}
 
 	async setMarkdownView(leaf: WorkspaceLeaf): Promise<void> {
@@ -313,9 +334,11 @@ export default class TimeLinkPlugin extends Plugin {
 			this.kanbanMarkdownModes.clear();
 			this.kanbanLeafFilePaths.clear();
 			this.removeKanbanRibbonIcon();
+			this.removeKanbanListRibbonIcon();
 			return;
 		}
 		this.ensureKanbanRibbonIcon();
+		this.ensureKanbanListRibbonIcon();
 		await this.restoreKanbanLeaves();
 	}
 
@@ -326,9 +349,26 @@ export default class TimeLinkPlugin extends Plugin {
 		});
 	}
 
+	private ensureKanbanListRibbonIcon(): void {
+		if (this.kanbanListRibbonIcon) return;
+		this.kanbanListRibbonIcon = this.addRibbonIcon(
+			KANBAN_LIST_VIEW_ICON,
+			'Open kanban list',
+			() => {
+				void this.openKanbanListView();
+			},
+		);
+	}
+
 	private removeKanbanRibbonIcon(): void {
 		if (!this.kanbanRibbonIcon) return;
 		this.kanbanRibbonIcon.remove();
 		this.kanbanRibbonIcon = null;
+	}
+
+	private removeKanbanListRibbonIcon(): void {
+		if (!this.kanbanListRibbonIcon) return;
+		this.kanbanListRibbonIcon.remove();
+		this.kanbanListRibbonIcon = null;
 	}
 }
