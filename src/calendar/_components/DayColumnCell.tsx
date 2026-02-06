@@ -4,6 +4,7 @@ type DayColumnCellProps = {
 	dateKey: string;
 	isToday: boolean;
 	isPressed: boolean;
+	showTodayBorder?: boolean;
 	className?: string;
 	style?: Record<string, string | number>;
 	onClick?: () => void;
@@ -12,10 +13,13 @@ type DayColumnCellProps = {
 	children?: ComponentChildren;
 };
 
+const TODAY_BORDER_COLOR = 'color-mix(in srgb, var(--text-error) 78%, black)';
+
 export const DayColumnCell = ({
 	dateKey,
 	isToday,
 	isPressed,
+	showTodayBorder = false,
 	className = '',
 	style,
 	onClick,
@@ -23,6 +27,16 @@ export const DayColumnCell = ({
 	onPointerEnter,
 	children,
 }: DayColumnCellProps) => {
+	const mergedStyle = {
+		...style,
+		...(showTodayBorder && isToday
+			? {
+					outline: `1px dotted ${TODAY_BORDER_COLOR}`,
+					outlineOffset: '-1px',
+				}
+			: {}),
+	};
+
 	return (
 		<div
 			data-date-key={dateKey}
@@ -31,7 +45,7 @@ export const DayColumnCell = ({
 			} ${
 				isPressed ? 'bg-[color-mix(in srgb, var(--interactive-accent) 16%, transparent)]' : ''
 			} ${className}`}
-			style={style}
+			style={mergedStyle}
 			onClick={onClick}
 			onPointerDown={onPointerDown}
 			onPointerEnter={onPointerEnter}

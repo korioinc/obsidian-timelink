@@ -256,12 +256,43 @@ export function removeLane(board: KanbanBoard, laneId: string): KanbanBoard {
 	return { lanes: board.lanes.filter((lane) => lane.id !== laneId), settings: board.settings };
 }
 
+function buildCardId(lane: KanbanLane): string {
+	return `card-${lane.cards.length}-${Date.now()}`;
+}
+
+export function insertCardAt(
+	board: KanbanBoard,
+	laneId: string,
+	index: number,
+	card: Pick<KanbanCard, 'title' | 'blockId'>,
+): KanbanBoard {
+	const normalizedTitle = card.title.replace(/\r\n/g, '\n').trim();
+	if (!normalizedTitle) return board;
+	const normalizedBlockId = card.blockId?.trim() || undefined;
+	return {
+		lanes: board.lanes.map((lane) => {
+			if (lane.id !== laneId) return lane;
+			const nextCards = [...lane.cards];
+			const nextCard: KanbanCard = {
+				id: buildCardId(lane),
+				title: normalizedTitle,
+				lineStart: lane.lineStart,
+				blockId: normalizedBlockId,
+			};
+			const clampedIndex = Math.max(0, Math.min(index, nextCards.length));
+			nextCards.splice(clampedIndex, 0, nextCard);
+			return { ...lane, cards: nextCards };
+		}),
+		settings: board.settings,
+	};
+}
+
 export function addCard(board: KanbanBoard, laneId: string, title: string): KanbanBoard {
 	return {
 		lanes: board.lanes.map((lane) => {
 			if (lane.id !== laneId) return lane;
 			const card: KanbanCard = {
-				id: `card-${lane.cards.length}-${Date.now()}`,
+				id: buildCardId(lane),
 				title,
 				lineStart: lane.lineStart,
 				blockId: undefined,

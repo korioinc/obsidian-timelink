@@ -1,6 +1,6 @@
 import type { KanbanBoard } from '../parser';
 import { CardEditorInput } from './CardEditorInput';
-import { isCardDragData, isLaneDragData, readCardOrder, readLaneOrder } from './drag';
+import { isLaneDragData, readCardOrder, readLaneOrder } from './drag';
 import { CheckIcon, ChevronIcon, DragIcon, MenuIcon, RemoveIcon, XIcon } from './icons';
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import {
@@ -11,7 +11,7 @@ import { preventUnhandled } from '@atlaskit/pragmatic-drag-and-drop/prevent-unha
 import type { DragLocation } from '@atlaskit/pragmatic-drag-and-drop/types';
 import type { App, Component } from 'obsidian';
 import { MarkdownRenderer, Menu, Modal, Notice, TFile, parseLinktext } from 'obsidian';
-import { h } from 'preact';
+import { h, type TargetedDragEvent } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 
 type LaneColumnProps = {
@@ -22,6 +22,7 @@ type LaneColumnProps = {
 	};
 	lane: KanbanBoard['lanes'][number];
 	wrapperRef: { current: HTMLDivElement | null };
+	cardHasEventById: Map<string, boolean>;
 	layout?: 'board' | 'list';
 	onCreateNoteFromCard: (cardId: string) => void;
 	onCopyCardLink: (cardId: string) => void;
@@ -33,6 +34,11 @@ type LaneColumnProps = {
 	onRemoveCard: (cardId: string) => Promise<void>;
 	onUpdateCardTitle: (cardId: string, title: string) => Promise<void>;
 	onMoveCard: (cardId: string, laneId: string, index: number) => Promise<void>;
+	onMoveCardFromOtherBoard: (
+		payload: CrossBoardCardMovePayload,
+		laneId: string,
+		index: number,
+	) => Promise<void>;
 };
 
 type MarkdownContext = LaneColumnProps['markdownContext'];
@@ -49,6 +55,7 @@ function CardTitle({
 		const host = hostRef.current;
 		if (!host) return;
 		host.innerHTML = '';
+		let cancelled = false;
 		const displayTitle = title.replace(/\r\n/g, '\n').replace(/\n/g, '<br>');
 		void MarkdownRenderer.render(
 			markdownContext.app,
@@ -56,7 +63,12 @@ function CardTitle({
 			host,
 			markdownContext.sourcePath,
 			markdownContext.component,
-		);
+		).then(() => {
+			if (cancelled) return;
+			host.querySelectorAll<HTMLAnchorElement>('a').forEach((anchor) => {
+				anchor.setAttribute('draggable', 'false');
+			});
+		});
 		const handleClick = (event: MouseEvent) => {
 			const target = event.target as HTMLElement | null;
 			if (!target) return;
@@ -70,6 +82,7 @@ function CardTitle({
 		};
 		host.addEventListener('click', handleClick);
 		return () => {
+			cancelled = true;
 			host.removeEventListener('click', handleClick);
 			host.innerHTML = '';
 		};
@@ -170,10 +183,68 @@ const draggableToLinks = (app: App, sourcePath: string, draggable: ObsidianDragg
 	}
 };
 
+export type CrossBoardCardMovePayload = {
+	sourceBoardPath: string;
+	cardId: string;
+	fromLaneId: string;
+	fromIndex: number;
+	title: string;
+	blockId?: string;
+};
+
+type ActiveCardDrag = CrossBoardCardMovePayload & {
+	handled: boolean;
+};
+
+const INTERNAL_CARD_DRAG_MIME = 'application/x-timelink-card';
+const INTERNAL_CARD_DRAG_TEXT_PREFIX = 'timelink-card:';
+let activeCardDrag: ActiveCardDrag | null = null;
+
+const parseCardDragPayload = (
+	dataTransfer: DataTransfer | null,
+): CrossBoardCardMovePayload | null => {
+	if (!dataTransfer) return null;
+	const raw =
+		dataTransfer.getData(INTERNAL_CARD_DRAG_MIME) ||
+		(() => {
+			const fallback = dataTransfer.getData('text/plain');
+			if (!fallback.startsWith(INTERNAL_CARD_DRAG_TEXT_PREFIX)) return '';
+			return fallback.slice(INTERNAL_CARD_DRAG_TEXT_PREFIX.length);
+		})();
+	if (!raw) {
+		if (!activeCardDrag) return null;
+		const { handled: _handled, ...payload } = activeCardDrag;
+		return payload;
+	}
+	try {
+		const parsed = JSON.parse(raw) as Partial<CrossBoardCardMovePayload>;
+		if (
+			typeof parsed.sourceBoardPath === 'string' &&
+			typeof parsed.cardId === 'string' &&
+			typeof parsed.fromLaneId === 'string' &&
+			typeof parsed.fromIndex === 'number' &&
+			typeof parsed.title === 'string'
+		) {
+			return {
+				sourceBoardPath: parsed.sourceBoardPath,
+				cardId: parsed.cardId,
+				fromLaneId: parsed.fromLaneId,
+				fromIndex: parsed.fromIndex,
+				title: parsed.title,
+				blockId: typeof parsed.blockId === 'string' ? parsed.blockId : undefined,
+			};
+		}
+		return null;
+	} catch {
+		return null;
+	}
+};
+
 export function LaneColumn({
 	markdownContext,
 	lane,
 	wrapperRef,
+	cardHasEventById,
 	layout = 'board',
 	onCreateNoteFromCard,
 	onCopyCardLink,
@@ -185,13 +256,12 @@ export function LaneColumn({
 	onRemoveCard: _onRemoveCard,
 	onUpdateCardTitle,
 	onMoveCard,
+	onMoveCardFromOtherBoard,
 }: LaneColumnProps): h.JSX.Element {
 	const laneRef = useRef<HTMLDivElement>(null);
 	const listRef = useRef<HTMLUListElement>(null);
 	const dragHandleRef = useRef<HTMLDivElement>(null);
 	const isSubmittingCardRef = useRef(false);
-	const cardCleanupRef = useRef(new Map<HTMLElement, () => void>());
-	const interactionLockRef = useRef(false);
 	const laneOrderRef = useRef<string[] | null>(null);
 	const cardOrderRef = useRef<{ listEl: HTMLUListElement; order: string[] } | null>(null);
 	const [isAdding, setIsAdding] = useState(false);
@@ -221,10 +291,19 @@ export function LaneColumn({
 		}
 		return null;
 	};
+	const getDropIndexFromPointer = (listEl: HTMLUListElement, y: number): number => {
+		const cards = Array.from(listEl.querySelectorAll<HTMLLIElement>('li[data-card-id]'));
+		for (const [i, cardEl] of cards.entries()) {
+			const rect = cardEl.getBoundingClientRect();
+			if (y < rect.top + rect.height / 2) return i;
+		}
+		return cards.length;
+	};
 	const restoreOrder = (container: HTMLElement, order: string[], dataAttr: string) => {
-		const fragment = document.createDocumentFragment();
+		const doc = container.ownerDocument;
+		const fragment = doc.createDocumentFragment();
 		order.forEach((id) => {
-			const el = document.querySelector<HTMLElement>(`[${dataAttr}="${id}"]`);
+			const el = doc.querySelector<HTMLElement>(`[${dataAttr}="${id}"]`);
 			if (el) {
 				fragment.appendChild(el);
 			}
@@ -301,97 +380,6 @@ export function LaneColumn({
 			}),
 		);
 	}, [lane.id, onReorderLanes, wrapperRef, isInteractionLocked, isListView]);
-
-	useEffect(() => {
-		const listEl = listRef.current;
-		if (!listEl) {
-			cardCleanupRef.current.forEach((cleanup) => cleanup());
-			cardCleanupRef.current.clear();
-			return;
-		}
-
-		if (interactionLockRef.current !== isInteractionLocked) {
-			cardCleanupRef.current.forEach((cleanup) => cleanup());
-			cardCleanupRef.current.clear();
-			interactionLockRef.current = isInteractionLocked;
-		}
-
-		const current = new Set<HTMLElement>();
-		listEl.querySelectorAll<HTMLLIElement>('li[data-card-id]').forEach((cardEl) => {
-			current.add(cardEl);
-			if (cardCleanupRef.current.has(cardEl)) return;
-			const cleanup = combine(
-				draggable({
-					element: cardEl,
-					canDrag: ({ input }) => input.button === 0 && !isInteractionLocked,
-					getInitialData: () => ({
-						type: 'card',
-						cardId: cardEl.dataset.cardId ?? '',
-						fromLaneId: lane.id,
-						fromIndex: Number(cardEl.dataset.index ?? 0),
-					}),
-					onDragStart: () => {
-						cardEl.classList.add('opacity-40');
-						const listEl = listRef.current;
-						if (listEl) {
-							cardOrderRef.current = { listEl, order: readCardOrder(listEl) };
-						}
-					},
-					onDrop: ({ location }) => {
-						cardEl.classList.remove('opacity-40');
-						if (location.current.dropTargets.length === 0 && cardOrderRef.current) {
-							restoreOrder(cardOrderRef.current.listEl, cardOrderRef.current.order, 'data-card-id');
-						}
-						cardOrderRef.current = null;
-					},
-				}),
-			);
-			cardCleanupRef.current.set(cardEl, cleanup);
-		});
-
-		cardCleanupRef.current.forEach((cleanup, el) => {
-			if (!current.has(el)) {
-				cleanup();
-				cardCleanupRef.current.delete(el);
-			}
-		});
-	}, [lane.cards, lane.id, onMoveCard, isCollapsed, isInteractionLocked]);
-
-	useEffect(() => {
-		const listEl = listRef.current;
-		if (!listEl) return;
-		return dropTargetForElements({
-			element: listEl,
-			canDrop: ({ source }) => isCardDragData(source.data) && !isInteractionLocked,
-			onDrag: ({ source, location }) => {
-				if (isInteractionLocked) return;
-				if (!isCardDragData(source.data)) return;
-				if (!isActiveDropTarget(listEl, location.current.dropTargets)) return;
-				const input = location.current.input;
-				const draggedEl = source.element;
-				if (!draggedEl) return;
-				if (draggedEl.parentElement !== listEl) {
-					listEl.appendChild(draggedEl);
-				}
-				const target = getCardTarget(listEl, input.clientY, draggedEl);
-				if (target) {
-					if (target.previousSibling !== draggedEl) {
-						listEl.insertBefore(draggedEl, target);
-					}
-				} else if (listEl.lastElementChild !== draggedEl) {
-					listEl.appendChild(draggedEl);
-				}
-			},
-			onDrop: ({ source, location }) => {
-				if (isInteractionLocked) return;
-				if (!isCardDragData(source.data)) return;
-				if (!isActiveDropTarget(listEl, location.current.dropTargets)) return;
-				const order = readCardOrder(listEl);
-				const index = order.indexOf(source.data.cardId);
-				void onMoveCard(source.data.cardId, lane.id, index === -1 ? listEl.children.length : index);
-			},
-		});
-	}, [lane.id, onMoveCard, isCollapsed, isInteractionLocked]);
 
 	useEffect(() => {
 		const listEl = listRef.current;
@@ -521,6 +509,70 @@ export function LaneColumn({
 		menu.showAtMouseEvent(event);
 	};
 
+	const handleCardDragOver = (event: TargetedDragEvent<HTMLUListElement>) => {
+		if (isInteractionLocked) return;
+		const payload = parseCardDragPayload(event.dataTransfer);
+		if (!payload) return;
+		event.preventDefault();
+		event.stopPropagation();
+		if (event.dataTransfer) {
+			event.dataTransfer.dropEffect = 'copy';
+		}
+		const listEl = listRef.current;
+		if (!listEl) return;
+		const isSameBoard = payload.sourceBoardPath === markdownContext.sourcePath;
+		if (!isSameBoard) {
+			return;
+		}
+		const draggedEl = listEl.ownerDocument.querySelector<HTMLLIElement>(
+			`li[data-card-id="${payload.cardId}"]`,
+		);
+		if (!draggedEl) return;
+		if (draggedEl.parentElement !== listEl) {
+			listEl.appendChild(draggedEl);
+		}
+		const target = getCardTarget(listEl, event.clientY, draggedEl);
+		if (target) {
+			if (target.previousSibling !== draggedEl) {
+				listEl.insertBefore(draggedEl, target);
+			}
+		} else if (listEl.lastElementChild !== draggedEl) {
+			listEl.appendChild(draggedEl);
+		}
+	};
+
+	const handleCardDrop = (event: TargetedDragEvent<HTMLUListElement>) => {
+		if (isInteractionLocked) return;
+		const payload = parseCardDragPayload(event.dataTransfer);
+		if (!payload) return;
+		event.preventDefault();
+		event.stopPropagation();
+		const listEl = listRef.current;
+		if (!listEl) return;
+		const isSameBoard = payload.sourceBoardPath === markdownContext.sourcePath;
+		const index = isSameBoard
+			? (() => {
+					const order = readCardOrder(listEl);
+					return order.indexOf(payload.cardId);
+				})()
+			: getDropIndexFromPointer(listEl, event.clientY);
+		if (index < 0) return;
+		if (
+			activeCardDrag &&
+			activeCardDrag.sourceBoardPath === payload.sourceBoardPath &&
+			activeCardDrag.cardId === payload.cardId &&
+			activeCardDrag.fromLaneId === payload.fromLaneId
+		) {
+			activeCardDrag.handled = true;
+		}
+		if (isSameBoard) {
+			if (payload.fromLaneId === lane.id && payload.fromIndex === index) return;
+			void onMoveCard(payload.cardId, lane.id, index);
+			return;
+		}
+		void onMoveCardFromOtherBoard(payload, lane.id, index);
+	};
+
 	return (
 		<div
 			ref={laneRef}
@@ -634,14 +686,73 @@ export function LaneColumn({
 					ref={listRef}
 					className="m-0 flex list-none flex-col gap-2 px-1.5 py-1"
 					data-lane-id={lane.id}
+					onDragOver={handleCardDragOver}
+					onDrop={handleCardDrop}
 				>
 					{lane.cards.map((card, index) => (
 						<li
 							key={card.id}
-							className="cursor-grab rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-secondary)] px-3 py-2 text-xs leading-snug break-words whitespace-pre-wrap text-[color:var(--text-normal)] hover:border-[var(--background-modifier-border-hover)] hover:bg-[var(--background-modifier-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
+							className="cursor-grab rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-secondary)] px-3 py-2 text-sm leading-snug break-words whitespace-pre-wrap text-[color:var(--text-normal)] hover:border-[var(--background-modifier-border-hover)] hover:bg-[var(--background-modifier-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]"
 							data-card-id={card.id}
 							data-lane-id={lane.id}
 							data-index={String(index)}
+							draggable={!isInteractionLocked}
+							onDragStart={(event) => {
+								if (isInteractionLocked) {
+									event.preventDefault();
+									return;
+								}
+								const listEl = listRef.current;
+								if (listEl) {
+									cardOrderRef.current = { listEl, order: readCardOrder(listEl) };
+								}
+								activeCardDrag = {
+									sourceBoardPath: markdownContext.sourcePath,
+									cardId: card.id,
+									fromLaneId: lane.id,
+									fromIndex: index,
+									title: card.title,
+									blockId: card.blockId,
+									handled: false,
+								};
+								event.currentTarget.classList.add('opacity-40');
+								if (event.dataTransfer) {
+									const payload: CrossBoardCardMovePayload = {
+										sourceBoardPath: markdownContext.sourcePath,
+										cardId: card.id,
+										fromLaneId: lane.id,
+										fromIndex: index,
+										title: card.title,
+										blockId: card.blockId,
+									};
+									const serialized = JSON.stringify(payload);
+									event.dataTransfer.setData(INTERNAL_CARD_DRAG_MIME, serialized);
+									event.dataTransfer.setData(
+										'text/plain',
+										`${INTERNAL_CARD_DRAG_TEXT_PREFIX}${serialized}`,
+									);
+									event.dataTransfer.effectAllowed = 'copyMove';
+								}
+							}}
+							onDragEnd={(event) => {
+								event.currentTarget.classList.remove('opacity-40');
+								if (
+									activeCardDrag &&
+									activeCardDrag.sourceBoardPath === markdownContext.sourcePath &&
+									activeCardDrag.cardId === card.id &&
+									activeCardDrag.fromLaneId === lane.id
+								) {
+									if (!activeCardDrag.handled && cardOrderRef.current) {
+										restoreOrder(
+											cardOrderRef.current.listEl,
+											cardOrderRef.current.order,
+											'data-card-id',
+										);
+									}
+									activeCardDrag = null;
+								}
+								cardOrderRef.current = null;
+							}}
 							onDblClick={() => {
 								cardTitleRef.current.set(card.id, card.title);
 								startEditCard(card.id, card.title);
@@ -665,7 +776,14 @@ export function LaneColumn({
 								/>
 							) : (
 								<div className="relative">
-									<CardTitle title={card.title} markdownContext={markdownContext} />
+									<div className="flex items-center gap-1">
+										{layout === 'board' && cardHasEventById.get(card.id) === true && (
+											<span className="shrink-0 align-middle leading-none" aria-hidden="true">
+												🗓️
+											</span>
+										)}
+										<CardTitle title={card.title} markdownContext={markdownContext} />
+									</div>
 									<span
 										role="button"
 										tabIndex={0}

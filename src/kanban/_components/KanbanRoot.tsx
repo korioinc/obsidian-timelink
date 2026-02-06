@@ -1,5 +1,6 @@
 import type { KanbanBoard } from '../parser';
 import { LaneColumn } from './LaneColumn';
+import type { CrossBoardCardMovePayload } from './LaneColumn';
 import { AddLaneForm } from './LaneForm';
 import type { App, Component } from 'obsidian';
 import { Fragment, h } from 'preact';
@@ -18,6 +19,7 @@ type KanbanRootProps = {
 	showAddLaneForm: boolean;
 	addLaneAnchorRect: DOMRect | null;
 	addLaneAnchorEl: HTMLElement | null | undefined;
+	cardHasEventById: Map<string, boolean>;
 	onCloseAddLaneForm: () => void;
 	onAddLane: (title: string) => Promise<void>;
 	onCreateNoteFromCard: (cardId: string) => void;
@@ -30,6 +32,11 @@ type KanbanRootProps = {
 	onRemoveCard: (cardId: string) => Promise<void>;
 	onUpdateCardTitle: (cardId: string, title: string) => Promise<void>;
 	onMoveCard: (cardId: string, laneId: string, index: number) => Promise<void>;
+	onMoveCardFromOtherBoard: (
+		payload: CrossBoardCardMovePayload,
+		laneId: string,
+		index: number,
+	) => Promise<void>;
 };
 
 export function KanbanRoot({
@@ -40,6 +47,7 @@ export function KanbanRoot({
 	showAddLaneForm,
 	addLaneAnchorRect,
 	addLaneAnchorEl,
+	cardHasEventById,
 	onCloseAddLaneForm,
 	onAddLane,
 	onCreateNoteFromCard,
@@ -52,6 +60,7 @@ export function KanbanRoot({
 	onRemoveCard,
 	onUpdateCardTitle,
 	onMoveCard,
+	onMoveCardFromOtherBoard,
 }: KanbanRootProps): h.JSX.Element {
 	const wrapperRef = useRef<HTMLDivElement>(null);
 	const [anchorRect, setAnchorRect] = useState<DOMRect | null>(addLaneAnchorRect ?? null);
@@ -115,6 +124,8 @@ export function KanbanRoot({
 							onRemoveCard={onRemoveCard}
 							onUpdateCardTitle={onUpdateCardTitle}
 							onMoveCard={onMoveCard}
+							onMoveCardFromOtherBoard={onMoveCardFromOtherBoard}
+							cardHasEventById={cardHasEventById}
 						/>
 					))}
 				</div>
@@ -181,6 +192,8 @@ export function KanbanRoot({
 							onRemoveCard={onRemoveCard}
 							onUpdateCardTitle={onUpdateCardTitle}
 							onMoveCard={onMoveCard}
+							onMoveCardFromOtherBoard={onMoveCardFromOtherBoard}
+							cardHasEventById={cardHasEventById}
 						/>
 					))}
 				</div>

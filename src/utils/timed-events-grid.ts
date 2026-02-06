@@ -74,6 +74,20 @@ export const buildTimedDayEntries = ({
 		startMinutes: number;
 		endMinutes: number;
 	}> = [];
+	const pushEntry = (segment: EventSegment, startMinutes: number, endMinutes: number) => {
+		const clampedStart = clampMinutes(startMinutes);
+		const clampedEnd = clampMinutes(endMinutes);
+		// Hide zero-length slices (e.g. next-day 00:00 tail segments).
+		if (clampedEnd <= clampedStart) {
+			return;
+		}
+		entries.push({
+			segment,
+			dayOffset,
+			startMinutes: clampedStart,
+			endMinutes: clampedEnd,
+		});
+	};
 
 	for (const segment of segments) {
 		const event = segment.event;
@@ -87,12 +101,7 @@ export const buildTimedDayEntries = ({
 		const isEndDay = dayKey === endKey;
 		const startMinutes = isStartDay ? (toMinutes(event.startTime) ?? 0) : 0;
 		const endMinutes = isEndDay ? (toMinutes(event.endTime) ?? MINUTES_IN_DAY) : MINUTES_IN_DAY;
-		entries.push({
-			segment,
-			dayOffset,
-			startMinutes: Math.max(0, Math.min(MINUTES_IN_DAY, startMinutes)),
-			endMinutes: Math.max(0, Math.min(MINUTES_IN_DAY, endMinutes)),
-		});
+		pushEntry(segment, startMinutes, endMinutes);
 	}
 
 	if (timedResizing && timedResizeRange) {
@@ -110,12 +119,7 @@ export const buildTimedDayEntries = ({
 				const startMinutes =
 					dayKey === rangeStartKey ? (toMinutes(timedResizing.event.startTime) ?? 0) : 0;
 				const endMinutes = dayKey === rangeEndKey ? timedResizeRange.endMinutes : MINUTES_IN_DAY;
-				entries.push({
-					segment: timedResizing,
-					dayOffset,
-					startMinutes,
-					endMinutes,
-				});
+				pushEntry(timedResizing, startMinutes, endMinutes);
 			}
 		}
 	}
@@ -138,12 +142,7 @@ export const buildTimedDayEntries = ({
 			}
 			const startMinutes = dayKey === rangeStartKey ? timedDragRange.startMinutes : 0;
 			const endMinutes = dayKey === rangeEndKey ? timedDragRange.endMinutes : MINUTES_IN_DAY;
-			entries.push({
-				segment: timedDragging,
-				dayOffset,
-				startMinutes,
-				endMinutes,
-			});
+			pushEntry(timedDragging, startMinutes, endMinutes);
 		}
 	}
 

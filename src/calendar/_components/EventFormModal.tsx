@@ -47,6 +47,7 @@ type EventFormViewProps = Omit<EventFormProps, 'primaryAction'> & {
 	primaryAction: () => void;
 	showTimeInputs: boolean;
 	showCompleted: boolean;
+	showQuickSetNextHourTask?: boolean;
 	onTitleChange: (value: string) => void;
 	onDateChange: (value: string) => void;
 	onAllDayChange: (checked: boolean) => void;
@@ -55,6 +56,7 @@ type EventFormViewProps = Omit<EventFormProps, 'primaryAction'> & {
 	onStartTimeChange: (value: string) => void;
 	onEndTimeChange: (value: string) => void;
 	onColorChange: (value: string) => void;
+	onQuickSetNextHourTask?: () => void;
 };
 
 const EXTRA_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6'];
@@ -104,6 +106,24 @@ const getDefaultEventColorHex = (): string => {
 	return resolveHexColor(value) ?? toHex(value);
 };
 
+const formatDateKey = (date: Date): string => {
+	const year = date.getFullYear();
+	const month = String(date.getMonth() + 1).padStart(2, '0');
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${year}-${month}-${day}`;
+};
+
+const formatHourBoundary = (hour: number): string => `${String(hour).padStart(2, '0')}:00`;
+
+const getNextHourTaskTimeRange = (now: Date): { startTime: string; endTime: string } => {
+	const startHour = (now.getHours() + 1) % 24;
+	const endHour = (startHour + 1) % 24;
+	return {
+		startTime: formatHourBoundary(startHour),
+		endTime: formatHourBoundary(endHour),
+	};
+};
+
 const EventForm = ({
 	title,
 	date,
@@ -115,6 +135,7 @@ const EventForm = ({
 	color,
 	showTimeInputs,
 	showCompleted,
+	showQuickSetNextHourTask,
 	primaryActionLabel,
 	secondaryActionLabel,
 	tertiaryActionLabel,
@@ -137,6 +158,7 @@ const EventForm = ({
 	onStartTimeChange,
 	onEndTimeChange,
 	onColorChange,
+	onQuickSetNextHourTask,
 	titleRef,
 	submitOnTitleEnter,
 }: EventFormViewProps) => {
@@ -209,6 +231,29 @@ const EventForm = ({
 						value={date}
 						onInput={(event) => onDateChange((event.target as HTMLInputElement).value)}
 					/>
+					{showQuickSetNextHourTask && onQuickSetNextHourTask ? (
+						<button
+							className="inline-flex h-10 w-10 items-center justify-center border border-[var(--background-modifier-border)] bg-[var(--background-primary)] text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)]"
+							type="button"
+							onClick={onQuickSetNextHourTask}
+							aria-label="Set next 1 hour task"
+							title="Set next 1 hour task"
+						>
+							<svg
+								className="h-4 w-4"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+								aria-hidden="true"
+							>
+								<circle cx="12" cy="12" r="8" />
+								<path d="M12 8v4l3 2" />
+							</svg>
+						</button>
+					) : null}
 					{showTimeInputs ? (
 						<div className="flex items-center gap-2">
 							<input
@@ -226,16 +271,18 @@ const EventForm = ({
 						</div>
 					) : null}
 				</div>
-				<div className="flex flex-col items-start gap-3">
-					<label className="mb-2 inline-flex items-center gap-2 text-sm text-[color:var(--text-normal)]">
-						<input
-							type="checkbox"
-							checked={allDay}
-							onChange={(event) => onAllDayChange(event.currentTarget.checked)}
-						/>
-						<span>{allDayLabel}</span>
-					</label>
-					<label className="mb-2 inline-flex items-center gap-2 text-sm text-[color:var(--text-normal)]">
+				<div className="flex w-full flex-col items-start gap-3">
+					<div className="flex w-full items-center gap-3">
+						<label className="inline-flex items-center gap-2 text-sm text-[color:var(--text-normal)]">
+							<input
+								type="checkbox"
+								checked={allDay}
+								onChange={(event) => onAllDayChange(event.currentTarget.checked)}
+							/>
+							<span>{allDayLabel}</span>
+						</label>
+					</div>
+					<label className="inline-flex items-center gap-2 text-sm text-[color:var(--text-normal)]">
 						<input
 							type="checkbox"
 							checked={taskEvent}
@@ -244,7 +291,7 @@ const EventForm = ({
 						<span>{taskEventLabel}</span>
 					</label>
 					{showCompleted ? (
-						<label className="mb-2 inline-flex items-center gap-2 text-sm text-[color:var(--text-normal)]">
+						<label className="inline-flex items-center gap-2 text-sm text-[color:var(--text-normal)]">
 							<input
 								type="checkbox"
 								checked={isCompleted}
@@ -364,6 +411,21 @@ const EventFormContainer = (props: EventFormProps) => {
 
 	const showTimeInputs = !draft.allDay;
 	const showCompleted = draft.taskEvent;
+	const todayKey = formatDateKey(new Date());
+	const showQuickSetNextHourTask =
+		props.headerTitle === 'Edit event' && draft.allDay && draft.date === todayKey;
+
+	const handleQuickSetNextHourTask = () => {
+		const { startTime, endTime } = getNextHourTaskTimeRange(new Date());
+		const nextDraft: EventFormDraft = {
+			...draft,
+			allDay: false,
+			taskEvent: true,
+			startTime,
+			endTime,
+		};
+		props.primaryAction(nextDraft);
+	};
 
 	return (
 		<EventForm
@@ -378,6 +440,7 @@ const EventFormContainer = (props: EventFormProps) => {
 			color={draft.color}
 			showTimeInputs={showTimeInputs}
 			showCompleted={showCompleted}
+			showQuickSetNextHourTask={showQuickSetNextHourTask}
 			onTitleChange={(value) => setDraft((prev) => ({ ...prev, title: value }))}
 			onDateChange={(value) => setDraft((prev) => ({ ...prev, date: value }))}
 			onAllDayChange={(checked) =>
@@ -397,6 +460,7 @@ const EventFormContainer = (props: EventFormProps) => {
 			onStartTimeChange={(value) => setDraft((prev) => ({ ...prev, startTime: value }))}
 			onEndTimeChange={(value) => setDraft((prev) => ({ ...prev, endTime: value }))}
 			onColorChange={(value) => setDraft((prev) => ({ ...prev, color: value }))}
+			onQuickSetNextHourTask={handleQuickSetNextHourTask}
 			primaryAction={() => props.primaryAction(draft)}
 		/>
 	);

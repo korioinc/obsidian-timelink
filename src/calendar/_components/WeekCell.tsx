@@ -38,6 +38,7 @@ const DAY_EVENT_TOP_PADDING = 4;
 const MORE_ROW_HEIGHT = EVENT_ROW_HEIGHT;
 const MORE_ROW_GAP = EVENT_ROW_GAP;
 const WEEK_DAY_KEYS = [0, 1, 2, 3, 4, 5, 6] as const;
+const TODAY_BORDER_COLOR = 'color-mix(in srgb, var(--text-error) 78%, black)';
 
 type WeekCapacityResult = {
 	containerRef: (el: HTMLDivElement | null) => void;
@@ -325,8 +326,10 @@ export const WeekCell = ({
 							pressed ? 'bg-[color-mix(in srgb, var(--interactive-accent) 16%, transparent)]' : ''
 						}`}
 						style={{
-							border: '0.5px solid',
-							borderColor: 'color-mix(in srgb, var(--background-modifier-border) 38%, transparent)',
+							border: today ? '1px dotted' : '0.5px solid',
+							borderColor: today
+								? TODAY_BORDER_COLOR
+								: 'color-mix(in srgb, var(--background-modifier-border) 38%, transparent)',
 						}}
 						onClick={() => onDateClick(cell.key)}
 						onPointerDown={() => onSelectionStart(cell.key)}

@@ -24,7 +24,7 @@ const EMPTY_HIDDEN_COUNTS: Record<WeekDayKey, number> = {
 	6: 0,
 };
 
-const parseTimeMinutes = (value?: string): number | null => {
+const parseTimeMinutes = (value?: string | null): number | null => {
 	if (!value) return null;
 	const parts = value.split(':');
 	if (parts.length < 2 || parts[0] === undefined || parts[1] === undefined) return null;
@@ -346,6 +346,17 @@ export const splitMultiDay = (
 	}
 	const start = event.date;
 	let end = event.endDate ?? event.date;
+	const endMinutes = parseTimeMinutes(event.endTime);
+	// Treat next-day 00:00 as an exclusive boundary so month/week spans do not include that day.
+	if (
+		!event.allDay &&
+		endMinutes === 0 &&
+		event.endDate &&
+		event.date &&
+		event.endDate !== event.date
+	) {
+		end = formatDate(addDays(parseDate(event.endDate), -1));
+	}
 	const startDate = parseDate(start);
 	let endDate = parseDate(end);
 	if (endDate < startDate) {
