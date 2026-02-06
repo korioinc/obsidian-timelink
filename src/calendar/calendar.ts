@@ -165,6 +165,26 @@ export class FullNoteCalendar {
 		if (!target || !(target instanceof TFile)) {
 			throw new Error(`File ${file.path} not found.`);
 		}
+
+		const cachedFrontmatter = this.plugin.app.metadataCache.getFileCache(target)?.frontmatter;
+		const existingCardLink =
+			typeof cachedFrontmatter?.[TIMELINK_CARD_KEY] === 'string'
+				? cachedFrontmatter[TIMELINK_CARD_KEY]
+				: null;
+		const cardPath = getFirstWikiLinkPath(existingCardLink ?? undefined);
+		const cardFile =
+			cardPath !== null
+				? this.plugin.app.metadataCache.getFirstLinkpathDest(cardPath, target.path)
+				: null;
+		if (cardFile && cardFile instanceof TFile) {
+			await this.plugin.app.fileManager.processFrontMatter(
+				cardFile,
+				(frontmatter: Record<string, unknown>) => {
+					delete frontmatter[TIMELINK_EVENT_KEY];
+				},
+			);
+		}
+
 		await this.plugin.app.fileManager.trashFile(target);
 	}
 
