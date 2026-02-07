@@ -211,17 +211,7 @@ const parseCardDragPayload = (
 			if (!fallback.startsWith(INTERNAL_CARD_DRAG_TEXT_PREFIX)) return '';
 			return fallback.slice(INTERNAL_CARD_DRAG_TEXT_PREFIX.length);
 		})();
-	if (!raw) {
-		if (!activeCardDrag) return null;
-		return {
-			sourceBoardPath: activeCardDrag.sourceBoardPath,
-			cardId: activeCardDrag.cardId,
-			fromLaneId: activeCardDrag.fromLaneId,
-			fromIndex: activeCardDrag.fromIndex,
-			title: activeCardDrag.title,
-			blockId: activeCardDrag.blockId,
-		};
-	}
+	if (!raw) return null;
 	try {
 		const parsed = JSON.parse(raw) as Partial<CrossBoardCardMovePayload>;
 		if (
@@ -308,8 +298,15 @@ export function LaneColumn({
 	const restoreOrder = (container: HTMLElement, order: string[], dataAttr: string) => {
 		const doc = container.ownerDocument;
 		const fragment = doc.createDocumentFragment();
+		const elementById = new Map<string, HTMLElement>();
+		Array.from(container.children).forEach((child) => {
+			const element = child as HTMLElement;
+			const id = element.getAttribute(dataAttr);
+			if (!id) return;
+			elementById.set(id, element);
+		});
 		order.forEach((id) => {
-			const el = doc.querySelector<HTMLElement>(`[${dataAttr}="${id}"]`);
+			const el = elementById.get(id);
 			if (el) {
 				fragment.appendChild(el);
 			}
@@ -530,8 +527,10 @@ export function LaneColumn({
 		if (!isSameBoard) {
 			return;
 		}
-		const draggedEl = listEl.ownerDocument.querySelector<HTMLLIElement>(
-			`li[data-card-id="${payload.cardId}"]`,
+		const scope = wrapperRef.current ?? listEl;
+		const draggedEl = Array.from(scope.querySelectorAll<HTMLLIElement>('li[data-card-id]')).find(
+			(element) =>
+				element.dataset.cardId === payload.cardId && element.dataset.laneId === payload.fromLaneId,
 		);
 		if (!draggedEl) return;
 		if (draggedEl.parentElement !== listEl) {
