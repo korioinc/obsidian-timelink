@@ -211,7 +211,17 @@ const parseCardDragPayload = (
 			if (!fallback.startsWith(INTERNAL_CARD_DRAG_TEXT_PREFIX)) return '';
 			return fallback.slice(INTERNAL_CARD_DRAG_TEXT_PREFIX.length);
 		})();
-	if (!raw) return null;
+	if (!raw) {
+		if (!activeCardDrag) return null;
+		return {
+			sourceBoardPath: activeCardDrag.sourceBoardPath,
+			cardId: activeCardDrag.cardId,
+			fromLaneId: activeCardDrag.fromLaneId,
+			fromIndex: activeCardDrag.fromIndex,
+			title: activeCardDrag.title,
+			blockId: activeCardDrag.blockId,
+		};
+	}
 	try {
 		const parsed = JSON.parse(raw) as Partial<CrossBoardCardMovePayload>;
 		if (
