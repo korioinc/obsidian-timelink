@@ -21,7 +21,8 @@ export const buildMonthGrid = (
 	const firstOfMonth = new Date(year, month - 1, 1);
 	const firstDay = firstOfMonth.getDay();
 	const offset = (firstDay - weekStartsOn + 7) % 7;
-	const start = addDays(firstOfMonth, -offset);
+	const startOffset = offset === 0 ? 7 : offset;
+	const start = addDays(firstOfMonth, -startOffset);
 	const grid: DayCellData[] = [];
 	for (let i = 0; i < 42; i += 1) {
 		const date = startOfDay(addDays(start, i));
@@ -41,13 +42,4 @@ export const buildWeekGrid = (date: Date, weekStartsOn: number): DayCellData[] =
 		grid.push({ date: cellDate, inMonth: cellDate.getMonth() === anchor.getMonth() });
 	}
 	return grid;
-};
-
-export const isToday = (date: Date): boolean => {
-	const today = new Date();
-	return (
-		date.getFullYear() === today.getFullYear() &&
-		date.getMonth() === today.getMonth() &&
-		date.getDate() === today.getDate()
-	);
 };
