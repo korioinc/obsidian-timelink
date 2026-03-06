@@ -1,18 +1,19 @@
 # TimeLink
 
-TimeLink is an Obsidian community plugin that connects a calendar, timeline, and kanban board in one place. It is designed to keep your tasks and events as linked notes without breaking your flow.
+TimeLink is an Obsidian community plugin that connects a calendar, timeline, kanban workflow, and board-level schedule overview in one place.
 
-Organize your to-do list with a kanban board and turn events written on the board into calendar items for schedule management. Use the timeline to manage tasks in detail and wrap up your day cleanly.
+It is built for linked-note workflows: create notes from cards, create events from cards, keep backlinks in sync, and review dated work from daily views up to a board-wide Gantt overview.
 
-This plugin is inspired by features from reference plugins, and adds per-board (category) color assignments so you can separate tasks more clearly in the calendar and timeline.
+## What TimeLink includes
 
-## Key features
-
-- Calendar: Create event notes and manage them by date.
-- Timeline: View events along a chronological flow.
-- Kanban board: Manage work on a board and link cards with event notes.
-- Board colors: Assign category colors to distinguish tasks in calendar/timeline views.
-- Link automation: Events created from cards link back to their cards.
+- **Calendar view**: Create and manage event notes by date.
+- **Timeline view**: Review timed and unscheduled work in chronological order.
+- **Kanban board view**: Manage tasks on boards, open markdown files as kanban boards, and add lists from the command palette.
+- **Kanban list view**: Browse kanban boards in your vault and refresh the board index from one place.
+- **Gantt view**: See dated kanban-linked events grouped by board in a year-based overview with a quick jump back to today.
+- **Board colors**: Apply per-board colors and reuse them in linked event displays.
+- **Linked note and event automation**: Create note/event links from cards and keep backlinks between cards and event notes in sync.
+- **Linked cleanup on card deletion**: Optionally remove the linked note and linked event when deleting a card.
 
 ## Screenshots
 
@@ -24,7 +25,7 @@ This plugin is inspired by features from reference plugins, and adds per-board (
 
 ![Calendar](assets/img_1.png)
 
-### Color settings and timeline panel
+### Timeline and board color settings
 
 ![Color settings and timeline](assets/img_2.png)
 
@@ -32,51 +33,70 @@ This plugin is inspired by features from reference plugins, and adds per-board (
 
 ![Default kanban board color](assets/img_3.png)
 
-### Board color applied → Calendar event inherits board color
+### Board color applied to linked calendar events
 
 ![Board color applied](assets/img_4.png)
 
 ## Getting started
 
-1. **Open from the ribbon**
-   - Calendar: calendar ribbon icon
-   - Timeline: timeline ribbon icon
-   - Kanban: kanban ribbon icon
+1. **Open the main views**
+   - Calendar: **Open calendar** ribbon icon
+   - Timeline: **Open timeline** ribbon icon or **Open timeline** command
+   - Kanban list: **Open kanban list** ribbon icon when kanban is enabled
+   - Gantt: **Open gantt** ribbon icon when kanban is enabled
 
-2. **Open from the command palette**
-   - **Open timeline**
-   - **Create kanban board**
-   - **Open active kanban board**
+2. **Create or open kanban boards**
+   - Ribbon: **Create kanban board**
+   - Command palette: **Create kanban board**
+   - File explorer folder menu: **New kanban board**
+   - Markdown file menu: **Open as kanban board**
+   - Command palette on an active markdown note: **Open active kanban board**
 
-3. **Create a board from a folder menu**
-   - File explorer → right-click a folder → **New kanban board**
+3. **Manage board structure**
+   - Command palette inside an active kanban board: **Add a list**
 
-## Workflow
+## Typical workflow
 
-### Kanban card → Create event
+### Card to note
 
-- From a kanban card menu, select **Create event from card**.
-- A card note and an event note are created and linked.
+- Use **New note from card** to create a linked markdown note from a kanban card.
+- Use **Copy link to card** to copy a direct link back to the card.
 
-### Link behavior
+### Card to event
 
-- Cards include links to their card notes.
-- Event notes include links back to the card.
+- Use **Create event from card** in the card menu.
+- TimeLink creates or reuses the linked card note, creates the event, and writes backlinks between the card note and event note.
+
+### Board-level planning
+
+- Assign a board color to visually group related work across kanban, calendar, timeline, and linked events.
+- Open **Kanban list** to scan boards in the vault.
+- Open **Gantt** to review dated kanban-linked events grouped by board and jump directly back to today.
+
+### Safe cleanup
+
+- When deleting a card, you can choose whether the linked note should also be removed.
+- If the card is linked to an event, TimeLink can remove the linked note and linked event together.
 
 ## Settings
 
-- **Enable kanban**: Turn kanban board features on or off.
-- **Calendar folder**: Set the folder where calendar event notes are stored.
+- **Enable kanban**: Enable or disable kanban, kanban list, and gantt-related features.
+- **Calendar folder**: Choose the folder where calendar event notes are stored.
 
-## Tips
+## Development
 
-- Create the calendar folder in advance to keep event notes organized.
-- The timeline is based on calendar events.
-- If you do not need kanban, disable **Enable kanban** to simplify the UI.
+```bash
+npm install
+npm run lint
+npm test
+npm run build
+```
+
+The automated test suite runs on Vitest and includes structure guards for the calendar, timeline, kanban, kanban-list, gantt, and shared layers.
 
 ## References
 
-This plugin was built with inspiration from the following Obsidian plugins:
+TimeLink is inspired by ideas from these Obsidian plugins:
 
 - https://github.com/mgmeyers/obsidian-kanban
 - https://github.com/obsidian-community/obsidian-full-calendar

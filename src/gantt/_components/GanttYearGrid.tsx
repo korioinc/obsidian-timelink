@@ -13,6 +13,7 @@ import type {
 	GanttYearView,
 } from '../types';
 import { resolveInitialGanttScrollLeft } from '../utils/initial-scroll';
+import { resolveGanttTooltipPlacement } from '../utils/tooltip-placement';
 import { useEffect, useRef } from 'preact/hooks';
 
 type GanttYearGridProps = {
@@ -109,55 +110,65 @@ const TaskNameCell = ({ row }: { row: GanttDisplayRow }) => (
 
 const EventRow = ({
 	row,
+	rowIndex,
 	onOpenBoard,
 	todayDayIndex,
 }: {
 	row: GanttDisplayRow;
+	rowIndex: number;
 	onOpenBoard: (boardPath: string) => void | Promise<void>;
 	todayDayIndex: number | null;
-}) => (
-	<div className="flex min-h-0 border-b border-[var(--background-modifier-border)]">
-		<BoardNameCell board={row.boardLabel} onOpenBoard={onOpenBoard} />
-		<TaskNameCell row={row} />
-		<div
-			className="relative shrink-0"
-			style={{
-				...buildTrackBackground(),
-				minWidth: 'var(--gantt-track-width)',
-				height: `${GANTT_ROW_HEIGHT}px`,
-			}}
-		>
-			{todayDayIndex !== null ? (
-				<div
-					className="absolute top-0 bottom-0"
-					style={{
-						left: `${todayDayIndex * GANTT_DAY_COLUMN_WIDTH}px`,
-						width: `${GANTT_DAY_COLUMN_WIDTH}px`,
-						backgroundColor: TODAY_HIGHLIGHT_STYLE,
-					}}
-				/>
-			) : null}
+}) => {
+	const tooltipPlacement = resolveGanttTooltipPlacement(rowIndex);
+	const tooltipPositionClass =
+		tooltipPlacement === 'below' ? 'top-[calc(100%+6px)]' : 'bottom-[calc(100%+6px)]';
+
+	return (
+		<div className="flex min-h-0 border-b border-[var(--background-modifier-border)]">
+			<BoardNameCell board={row.boardLabel} onOpenBoard={onOpenBoard} />
+			<TaskNameCell row={row} />
 			<div
-				className="group absolute top-[6px] bottom-[6px]"
+				className="relative shrink-0"
 				style={{
-					left: `${row.startDayIndex * GANTT_DAY_COLUMN_WIDTH}px`,
-					width: `${row.spanDays * GANTT_DAY_COLUMN_WIDTH}px`,
+					...buildTrackBackground(),
+					minWidth: 'var(--gantt-track-width)',
+					height: `${GANTT_ROW_HEIGHT}px`,
 				}}
 			>
+				{todayDayIndex !== null ? (
+					<div
+						className="absolute top-0 bottom-0"
+						style={{
+							left: `${todayDayIndex * GANTT_DAY_COLUMN_WIDTH}px`,
+							width: `${GANTT_DAY_COLUMN_WIDTH}px`,
+							backgroundColor: TODAY_HIGHLIGHT_STYLE,
+						}}
+					/>
+				) : null}
 				<div
-					className="h-full w-full rounded-md border opacity-90"
+					className="group absolute top-[6px] bottom-[6px]"
 					style={{
-						backgroundColor: row.color,
-						borderColor: row.color,
+						left: `${row.startDayIndex * GANTT_DAY_COLUMN_WIDTH}px`,
+						width: `${row.spanDays * GANTT_DAY_COLUMN_WIDTH}px`,
 					}}
-				/>
-				<div className="pointer-events-none absolute bottom-[calc(100%+6px)] left-1/2 z-10 max-w-[220px] -translate-x-1/2 rounded-md border border-[color:rgba(255,255,255,0.22)] bg-[color:rgba(16,18,24,0.96)] px-2 py-1 text-xs font-medium whitespace-nowrap text-white opacity-0 shadow-[0_10px_30px_rgba(0,0,0,0.45)] transition group-hover:opacity-100">
-					<div className="truncate">{row.title}</div>
+				>
+					<div
+						className="h-full w-full rounded-md border opacity-90"
+						style={{
+							backgroundColor: row.color,
+							borderColor: row.color,
+						}}
+					/>
+					<div
+						className={`pointer-events-none absolute left-1/2 z-10 max-w-[220px] -translate-x-1/2 rounded-md border border-[color:rgba(255,255,255,0.22)] bg-[color:rgba(16,18,24,0.96)] px-2 py-1 text-xs font-medium whitespace-nowrap text-white opacity-0 shadow-[0_10px_30px_rgba(0,0,0,0.45)] transition group-hover:opacity-100 ${tooltipPositionClass}`}
+					>
+						<div className="truncate">{row.title}</div>
+					</div>
 				</div>
 			</div>
 		</div>
-	</div>
-);
+	);
+};
 
 export const GanttYearGrid = ({
 	view,
@@ -237,11 +248,12 @@ export const GanttYearGrid = ({
 						</div>
 					</div>
 				</div>
-				{view.rows.map((row) => (
+				{view.rows.map((row, rowIndex) => (
 					<EventRow
 						key={row.id}
 						onOpenBoard={onOpenBoard}
 						row={row}
+						rowIndex={rowIndex}
 						todayDayIndex={view.todayDayIndex}
 					/>
 				))}
