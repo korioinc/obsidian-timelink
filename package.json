@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-timelink",
-	"version": "1.0.10",
+	"version": "1.0.11",
 	"description": "Kanban board, calendar, and timeline views with linked event notes for Obsidian.",
 	"main": "main.js",
 	"type": "module",
@@ -12,7 +12,7 @@
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
-		"test": "node --test src/**/*.test.ts"
+		"test": "tsx --test src/**/*.test.ts"
 	},
 	"keywords": [
 		"obsidian",
@@ -23,7 +23,7 @@
 	],
 	"license": "0-BSD",
 	"engines": {
-		"node": ">=20 <25",
+		"node": ">=20 <26",
 		"npm": ">=10 <11"
 	},
 	"devDependencies": {
@@ -45,6 +45,7 @@
 		"prettier-plugin-tailwindcss": "^0.7.2",
 		"tailwindcss": "^4.1.18",
 		"tslib": "2.4.0",
+		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.54.0"
 	},

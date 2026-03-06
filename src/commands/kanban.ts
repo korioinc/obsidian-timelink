@@ -1,5 +1,5 @@
-import { openCreateKanbanModal } from '../kanban/modal';
 import { KanbanView } from '../kanban/view';
+import { openCreateKanbanModal } from '../kanban/view/modal';
 import type TimeLinkPlugin from '../main';
 import { Notice, TFile } from 'obsidian';
 

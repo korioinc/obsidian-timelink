@@ -7,10 +7,49 @@ type TimelineHeaderProps = {
 	onToday: () => void;
 };
 
+type HeaderIconButtonProps = {
+	className: string;
+	ariaLabel: string;
+	onActivate: () => void;
+	children: JSX.Element | string;
+};
+
 const iconButtonClass =
 	'flex h-5 w-5 items-center justify-center rounded-lg border border-transparent bg-[var(--background-secondary)] text-[11px] text-[color:var(--text-normal)] transition hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)]';
 const mutedIconButtonClass =
 	'flex h-5 w-5 items-center justify-center rounded-lg border border-transparent bg-[var(--background-secondary)] text-[color:var(--text-muted)] transition hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)]';
+
+const HeaderIconButton = ({
+	className,
+	ariaLabel,
+	onActivate,
+	children,
+}: HeaderIconButtonProps): JSX.Element => (
+	<div
+		className={className}
+		onPointerDown={(event) => {
+			event.preventDefault();
+			event.stopPropagation();
+		}}
+		onClick={(event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			onActivate();
+		}}
+		role="button"
+		tabIndex={0}
+		aria-label={ariaLabel}
+		onKeyDown={(event) => {
+			if (event.key === 'Enter' || event.key === ' ') {
+				event.preventDefault();
+				event.stopPropagation();
+				onActivate();
+			}
+		}}
+	>
+		{children}
+	</div>
+);
 
 export const TimelineHeader = ({
 	title,
@@ -25,76 +64,13 @@ export const TimelineHeader = ({
 		}}
 	>
 		<div className="flex items-center gap-1.5">
-			<div
-				className={iconButtonClass}
-				onPointerDown={(event) => {
-					event.preventDefault();
-					event.stopPropagation();
-				}}
-				onClick={(event) => {
-					event.preventDefault();
-					event.stopPropagation();
-					onPrev();
-				}}
-				role="button"
-				tabIndex={0}
-				aria-label="Previous day"
-				onKeyDown={(event) => {
-					if (event.key === 'Enter' || event.key === ' ') {
-						event.preventDefault();
-						event.stopPropagation();
-						onPrev();
-					}
-				}}
-			>
+			<HeaderIconButton className={iconButtonClass} ariaLabel="Previous day" onActivate={onPrev}>
 				←
-			</div>
-			<div
-				className={iconButtonClass}
-				onPointerDown={(event) => {
-					event.preventDefault();
-					event.stopPropagation();
-				}}
-				onClick={(event) => {
-					event.preventDefault();
-					event.stopPropagation();
-					onNext();
-				}}
-				role="button"
-				tabIndex={0}
-				aria-label="Next day"
-				onKeyDown={(event) => {
-					if (event.key === 'Enter' || event.key === ' ') {
-						event.preventDefault();
-						event.stopPropagation();
-						onNext();
-					}
-				}}
-			>
+			</HeaderIconButton>
+			<HeaderIconButton className={iconButtonClass} ariaLabel="Next day" onActivate={onNext}>
 				→
-			</div>
-			<div
-				className={mutedIconButtonClass}
-				onPointerDown={(event) => {
-					event.preventDefault();
-					event.stopPropagation();
-				}}
-				onClick={(event) => {
-					event.preventDefault();
-					event.stopPropagation();
-					onToday();
-				}}
-				aria-label="Today"
-				role="button"
-				tabIndex={0}
-				onKeyDown={(event) => {
-					if (event.key === 'Enter' || event.key === ' ') {
-						event.preventDefault();
-						event.stopPropagation();
-						onToday();
-					}
-				}}
-			>
+			</HeaderIconButton>
+			<HeaderIconButton className={mutedIconButtonClass} ariaLabel="Today" onActivate={onToday}>
 				<svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" className="block">
 					<rect
 						x="3.5"
@@ -115,7 +91,7 @@ export const TimelineHeader = ({
 						strokeLinecap="round"
 					/>
 				</svg>
-			</div>
+			</HeaderIconButton>
 		</div>
 		<div className="text-[12px] font-semibold tracking-tight text-[color:var(--text-normal)]">
 			{title}

@@ -87,12 +87,6 @@ npm run build
   ```
 - Reload Obsidian and enable the plugin in **Settings → Community plugins**.
 
-## IMPORTANT: No test.ts files
-
-- NEVER create or add `*.test.ts` files in this repository.
-- NEVER introduce Node test runner usage (for example, `node --test`) as part of changes.
-- Verification must be done via build/typecheck and manual Obsidian testing only.
-
 ## Commands & settings
 
 - Any user-facing commands should be added via `this.addCommand(...)`.
