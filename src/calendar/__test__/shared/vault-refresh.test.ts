@@ -1,10 +1,8 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	isPathInDirectory,
 	registerVaultPathRefresh,
 } from '../../../shared/vault/register-vault-path-refresh.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 type EventName = 'create' | 'modify' | 'delete' | 'rename';
 
@@ -41,11 +39,11 @@ const createFakeVault = (): FakeVault => {
 };
 
 void test('isPathInDirectory matches directory and descendants only', () => {
-	assert.equal(isPathInDirectory('calendar', 'calendar'), true);
-	assert.equal(isPathInDirectory('calendar/day.md', 'calendar'), true);
-	assert.equal(isPathInDirectory('calendar2/day.md', 'calendar'), false);
-	assert.equal(isPathInDirectory('', 'calendar'), false);
-	assert.equal(isPathInDirectory(null, 'calendar'), false);
+	assert.strictEqual(isPathInDirectory('calendar', 'calendar'), true);
+	assert.strictEqual(isPathInDirectory('calendar/day.md', 'calendar'), true);
+	assert.strictEqual(isPathInDirectory('calendar2/day.md', 'calendar'), false);
+	assert.strictEqual(isPathInDirectory('', 'calendar'), false);
+	assert.strictEqual(isPathInDirectory(null, 'calendar'), false);
 });
 
 void test('registerVaultPathRefresh reacts only to matching paths and unsubscribes cleanly', () => {

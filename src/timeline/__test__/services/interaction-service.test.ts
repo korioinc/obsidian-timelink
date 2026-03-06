@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	createAllDayEventSegment as createSegment,
 	createEventModalState as createModalState,
@@ -10,8 +9,7 @@ import type {
 	EventModalState,
 	EventSegment,
 } from '../../../shared/event/types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createTimelineInteractionHandlers = (params: {
 	modal: EventModalState | null;
@@ -94,10 +92,10 @@ void test('createTimelineInteractionHandlers event click closes selection and op
 
 	handlers.handleEventClick(segment);
 
-	assert.equal(endSelectionCount, 1);
-	assert.equal(modalTitle, 'Clicked');
-	assert.equal(modalStartTime, '09:00');
-	assert.equal(modalEndTime, '10:00');
+	assert.strictEqual(endSelectionCount, 1);
+	assert.strictEqual(modalTitle, 'Clicked');
+	assert.strictEqual(modalStartTime, '09:00');
+	assert.strictEqual(modalEndTime, '10:00');
 });
 
 void test('createTimelineInteractionHandlers modal save reports notice for empty title', () => {
@@ -132,7 +130,7 @@ void test('createTimelineInteractionHandlers modal save reports notice for empty
 		color: '',
 	});
 
-	assert.equal(noticeMessage, 'Please enter a title.');
+	assert.strictEqual(noticeMessage, 'Please enter a title.');
 });
 
 void test('createTimelineInteractionHandlers create save triggers event creation and closes modal', () => {
@@ -181,8 +179,8 @@ void test('createTimelineInteractionHandlers create save triggers event creation
 		color: '',
 	});
 
-	assert.equal(createdTitle, 'Created');
-	assert.equal(closeCount, 1);
+	assert.strictEqual(createdTitle, 'Created');
+	assert.strictEqual(closeCount, 1);
 });
 
 void test('createTimelineInteractionHandlers open note reports notice when path is missing', () => {
@@ -208,5 +206,5 @@ void test('createTimelineInteractionHandlers open note reports notice when path 
 
 	handlers.handleOpenNote();
 
-	assert.equal(noticeMessage, 'Unable to find the note path.');
+	assert.strictEqual(noticeMessage, 'Unable to find the note path.');
 });

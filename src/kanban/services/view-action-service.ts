@@ -3,6 +3,7 @@ import type { CrossBoardCardMovePayload } from '../utils/card-dnd';
 import { buildCardTitleWithPrimaryLink } from '../utils/card-title';
 import type { CardActionContext } from './card-action-service';
 import { copyCardLink, createEventFromCard, createNoteFromCard } from './card-action-service';
+import { removeCardWithLinkedCleanup } from './card-removal-service';
 import {
 	addCard,
 	addLane,
@@ -173,8 +174,20 @@ export const buildKanbanRootActionHandlers = (
 	onUpdateLaneTitle: async (laneId: string, title: string) => {
 		await context.applyBoardMutation((board) => updateLaneTitle(board, laneId, title));
 	},
-	onRemoveCard: async (cardId: string) => {
-		await context.applyBoardMutation((board) => removeCard(board, cardId));
+	onRemoveCard: async (cardId: string, options) => {
+		await removeCardWithLinkedCleanup({
+			app: context.app,
+			board: context.getBoard(),
+			sourceFile: context.getFile(),
+			cardId,
+			options,
+			calendar: context.calendar,
+			applyBoardMutation: context.applyBoardMutation,
+			cardEventProperty: context.cardEventProperty,
+			notice: (message: string) => {
+				new Notice(message);
+			},
+		});
 	},
 	onUpdateCardTitle: async (cardId: string, title: string) => {
 		await context.applyBoardMutation((board) => updateCardTitle(board, cardId, title));

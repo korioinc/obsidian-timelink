@@ -1,8 +1,6 @@
-/* eslint-disable import/no-nodejs-modules */
 import { buildEventFilename, toEventFromFrontmatter } from '../../event/note-calendar-utils.ts';
 import type { CalendarEvent } from '../../event/types.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createEvent = (overrides: Partial<CalendarEvent>): CalendarEvent => ({
 	title: 'Sample event',
@@ -19,10 +17,10 @@ void test('toEventFromFrontmatter returns defaults without mutating source front
 
 	const event = toEventFromFrontmatter(frontmatter, 'Sample');
 
-	assert.equal(event.title, 'Sample');
-	assert.equal(event.allDay, false);
-	assert.equal(frontmatter.title, undefined);
-	assert.equal(frontmatter.allDay, undefined);
+	assert.strictEqual(event.title, 'Sample');
+	assert.strictEqual(event.allDay, false);
+	assert.strictEqual(frontmatter.title, undefined);
+	assert.strictEqual(frontmatter.allDay, undefined);
 });
 
 void test('buildEventFilename sanitizes unsupported filename characters', () => {
@@ -31,5 +29,5 @@ void test('buildEventFilename sanitizes unsupported filename characters', () => 
 			title: 'Roadmap / Q2: core*api?<>"|',
 		}),
 	);
-	assert.equal(filename, '2026-03-02 Roadmap Q2 core api.md');
+	assert.strictEqual(filename, '2026-03-02 Roadmap Q2 core api.md');
 });

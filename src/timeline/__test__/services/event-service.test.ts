@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	createEventEntry,
 	deleteEventEntry,
@@ -10,8 +9,7 @@ import type {
 	EventLocation,
 	CalendarEvent,
 } from '../../../shared/event/types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createLocation = (path: string): EventLocation => ({
 	file: { path },
@@ -88,21 +86,22 @@ void test('saveEventEntry updates event and location on success', async () => {
 	const updatedLocation = createLocation('calendar/after.md');
 	const harness = createSetEventsHarness([previous]);
 	const calendar: CalendarMock = {
-		modifyEvent: async (_location, _event, onUpdateLocation) => {
+		modifyEvent: (_location, _event, onUpdateLocation) => {
 			onUpdateLocation(updatedLocation);
+			return Promise.resolve();
 		},
-		deleteEvent: async () => {},
-		createEvent: async () => createLocation('calendar/new.md'),
+		deleteEvent: () => Promise.resolve(),
+		createEvent: () => Promise.resolve(createLocation('calendar/new.md')),
 	};
 	const { deps, reloadCount, notices } = createDeps(calendar, harness.setEvents);
 
 	await saveEventEntry(deps, next, previous);
 
-	assert.equal(reloadCount(), 1);
+	assert.strictEqual(reloadCount(), 1);
 	assert.deepEqual(notices, []);
-	assert.equal(harness.getState().length, 1);
-	assert.equal(harness.getState()[0]?.[0].title, 'After');
-	assert.equal(harness.getState()[0]?.[1].file.path, 'calendar/after.md');
+	assert.strictEqual(harness.getState().length, 1);
+	assert.strictEqual(harness.getState()[0]?.[0].title, 'After');
+	assert.strictEqual(harness.getState()[0]?.[1].file.path, 'calendar/after.md');
 });
 
 void test('saveEventEntry rolls back to previous event on failure', async () => {
@@ -110,20 +109,18 @@ void test('saveEventEntry rolls back to previous event on failure', async () => 
 	const next = createEntry({ title: 'After' }, 'calendar/before.md');
 	const harness = createSetEventsHarness([previous]);
 	const calendar: CalendarMock = {
-		modifyEvent: async () => {
-			throw new Error('save failed');
-		},
-		deleteEvent: async () => {},
-		createEvent: async () => createLocation('calendar/new.md'),
+		modifyEvent: () => Promise.reject(new Error('save failed')),
+		deleteEvent: () => Promise.resolve(),
+		createEvent: () => Promise.resolve(createLocation('calendar/new.md')),
 	};
 	const { deps, reloadCount, notices } = createDeps(calendar, harness.setEvents);
 
 	await saveEventEntry(deps, next, previous);
 
-	assert.equal(reloadCount(), 1);
+	assert.strictEqual(reloadCount(), 1);
 	assert.deepEqual(notices, ['Failed to save the event.']);
-	assert.equal(harness.getState().length, 1);
-	assert.equal(harness.getState()[0]?.[0].title, 'Before');
+	assert.strictEqual(harness.getState().length, 1);
+	assert.strictEqual(harness.getState()[0]?.[0].title, 'Before');
 });
 
 void test('createEventEntry passes timeline creator and appends new entry', async () => {
@@ -131,44 +128,42 @@ void test('createEventEntry passes timeline creator and appends new entry', asyn
 	const rawEvent = createEvent({ title: 'Created event', creator: undefined });
 	let createPayload: unknown = null;
 	const calendar: CalendarMock = {
-		modifyEvent: async () => {},
-		deleteEvent: async () => {},
-		createEvent: async (event: CalendarEvent) => {
+		modifyEvent: () => Promise.resolve(),
+		deleteEvent: () => Promise.resolve(),
+		createEvent: (event: CalendarEvent) => {
 			createPayload = event;
-			return createLocation('calendar/created.md');
+			return Promise.resolve(createLocation('calendar/created.md'));
 		},
 	};
 	const { deps, reloadCount, notices } = createDeps(calendar, harness.setEvents);
 
 	await createEventEntry(deps, rawEvent, 'timeline');
 
-	assert.equal(reloadCount(), 1);
+	assert.strictEqual(reloadCount(), 1);
 	assert.deepEqual(notices, []);
-	assert.equal((createPayload as { creator?: string } | null)?.creator, 'timeline');
-	assert.equal(harness.getState().length, 1);
-	assert.equal(harness.getState()[0]?.[0].title, 'Created event');
-	assert.equal(harness.getState()[0]?.[0].creator, undefined);
-	assert.equal(harness.getState()[0]?.[1].file.path, 'calendar/created.md');
+	assert.strictEqual((createPayload as { creator?: string } | null)?.creator, 'timeline');
+	assert.strictEqual(harness.getState().length, 1);
+	assert.strictEqual(harness.getState()[0]?.[0].title, 'Created event');
+	assert.strictEqual(harness.getState()[0]?.[0].creator, undefined);
+	assert.strictEqual(harness.getState()[0]?.[1].file.path, 'calendar/created.md');
 });
 
 void test('deleteEventEntry keeps state and reports notice on failure', async () => {
 	const entry = createEntry({ title: 'To keep' }, 'calendar/keep.md');
 	const harness = createSetEventsHarness([entry]);
 	const calendar: CalendarMock = {
-		modifyEvent: async () => {},
-		deleteEvent: async () => {
-			throw new Error('delete failed');
-		},
-		createEvent: async () => createLocation('calendar/new.md'),
+		modifyEvent: () => Promise.resolve(),
+		deleteEvent: () => Promise.reject(new Error('delete failed')),
+		createEvent: () => Promise.resolve(createLocation('calendar/new.md')),
 	};
 	const { deps, reloadCount, notices } = createDeps(calendar, harness.setEvents);
 
 	await deleteEventEntry(deps, entry);
 
-	assert.equal(reloadCount(), 1);
+	assert.strictEqual(reloadCount(), 1);
 	assert.deepEqual(notices, ['Failed to delete the event.']);
-	assert.equal(harness.getState().length, 1);
-	assert.equal(harness.getState()[0]?.[0].title, 'To keep');
+	assert.strictEqual(harness.getState().length, 1);
+	assert.strictEqual(harness.getState()[0]?.[0].title, 'To keep');
 });
 
 void test('deleteEventEntry removes matching entry by location value', async () => {
@@ -182,15 +177,15 @@ void test('deleteEventEntry removes matching entry by location value', async () 
 	];
 	const harness = createSetEventsHarness([storedEntry]);
 	const calendar: CalendarMock = {
-		modifyEvent: async () => {},
-		deleteEvent: async () => {},
-		createEvent: async () => createLocation('calendar/new.md'),
+		modifyEvent: () => Promise.resolve(),
+		deleteEvent: () => Promise.resolve(),
+		createEvent: () => Promise.resolve(createLocation('calendar/new.md')),
 	};
 	const { deps, reloadCount, notices } = createDeps(calendar, harness.setEvents);
 
 	await deleteEventEntry(deps, entry);
 
-	assert.equal(reloadCount(), 1);
+	assert.strictEqual(reloadCount(), 1);
 	assert.deepEqual(notices, []);
-	assert.equal(harness.getState().length, 0);
+	assert.strictEqual(harness.getState().length, 0);
 });

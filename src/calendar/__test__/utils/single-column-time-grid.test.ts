@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	buildSingleColumnTimedEventRenderModel,
 	resolveSingleColumnOverlayState,
@@ -9,8 +8,7 @@ import type {
 	TimeSelectionRange,
 	TimedEventPlacement,
 } from '../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createPlacement = (
 	eventOverrides: Partial<CalendarEvent> = {},
@@ -66,11 +64,11 @@ void test('resolveSingleColumnOverlayState returns overlay segments for matching
 		timedDragRange: createRange({ startMinutes: 10 * 60, endMinutes: 11 * 60 }),
 	});
 
-	assert.equal(state.selectionSegments.length, 1);
-	assert.equal(state.selectionSegments[0]?.startMinutes, 8 * 60);
-	assert.equal(state.timedDragSegments.length, 1);
-	assert.equal(state.timedDragSegments[0]?.endMinutes, 11 * 60);
-	assert.equal(state.showTimedDrag, true);
+	assert.strictEqual(state.selectionSegments.length, 1);
+	assert.strictEqual(state.selectionSegments[0]?.startMinutes, 8 * 60);
+	assert.strictEqual(state.timedDragSegments.length, 1);
+	assert.strictEqual(state.timedDragSegments[0]?.endMinutes, 11 * 60);
+	assert.strictEqual(state.showTimedDrag, true);
 	assert.deepEqual(state.resizeRangeKeys, { startKey: '2026-03-01', endKey: '2026-03-01' });
 });
 
@@ -89,14 +87,14 @@ void test('buildSingleColumnTimedEventRenderModel derives geometry and labels', 
 		formatTime: (minutes) => `${minutes}`,
 	});
 
-	assert.equal(model.draggable, true);
-	assert.equal(model.eventColor, '#112233');
-	assert.equal(model.left, 0);
-	assert.equal(model.width, 100);
-	assert.equal(model.startLabel, '540');
-	assert.equal(model.endLabel, '600');
-	assert.equal(model.visualTop, (540 / 30) * 28);
-	assert.equal(model.visualHeight, ((600 - 540) / 30) * 28);
+	assert.strictEqual(model.draggable, true);
+	assert.strictEqual(model.eventColor, '#112233');
+	assert.strictEqual(model.left, 0);
+	assert.strictEqual(model.width, 100);
+	assert.strictEqual(model.startLabel, '540');
+	assert.strictEqual(model.endLabel, '600');
+	assert.strictEqual(model.visualTop, (540 / 30) * 28);
+	assert.strictEqual(model.visualHeight, ((600 - 540) / 30) * 28);
 });
 
 void test('buildSingleColumnTimedEventRenderModel clamps drag end label for cross-day drag', () => {
@@ -120,9 +118,9 @@ void test('buildSingleColumnTimedEventRenderModel clamps drag end label for cros
 		formatTime: (minutes) => `${minutes}`,
 	});
 
-	assert.equal(model.isDraggingEvent, true);
-	assert.equal(model.startLabel, '600');
-	assert.equal(model.endLabel, '1440');
+	assert.strictEqual(model.isDraggingEvent, true);
+	assert.strictEqual(model.startLabel, '600');
+	assert.strictEqual(model.endLabel, '1440');
 });
 
 void test('buildSingleColumnTimedEventRenderModel disables dragging when event has no date', () => {
@@ -140,5 +138,5 @@ void test('buildSingleColumnTimedEventRenderModel disables dragging when event h
 		formatTime: (minutes) => `${minutes}`,
 	});
 
-	assert.equal(model.draggable, false);
+	assert.strictEqual(model.draggable, false);
 });

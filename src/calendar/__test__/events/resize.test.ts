@@ -1,11 +1,9 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	createResizeEffectHandlers,
 	handleResizeStartFactory,
 } from '../../services/interaction/resize.ts';
 import type { CalendarEvent, EventSegment } from '../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createSegment = (
 	eventOverrides: Partial<CalendarEvent> = {},
@@ -45,7 +43,7 @@ void test('createResizeEffectHandlers returns null when no active resizing exist
 		() => undefined,
 		{ current: true },
 	);
-	assert.equal(handlers, null);
+	assert.strictEqual(handlers, null);
 });
 
 void test('createResizeEffectHandlers updates hover on pointer move and clamps end date on pointer up', async () => {
@@ -80,17 +78,17 @@ void test('createResizeEffectHandlers updates hover on pointer move and clamps e
 
 		assert.ok(handlers);
 		handlers.handlePointerMove({ clientX: 500, clientY: 200 } as PointerEvent);
-		assert.equal(hover, '2026-03-06');
+		assert.strictEqual(hover, '2026-03-06');
 
 		handlers.handlePointerUp();
 		await new Promise((resolve) => setTimeout(resolve, 0));
 
-		assert.equal(previousDate, '2026-03-03');
-		assert.equal(nextDate, '2026-03-03');
-		assert.equal(nextEndDate, undefined);
-		assert.equal(activeResizing, null);
-		assert.equal(hover, null);
-		assert.equal(isResizingRef.current, false);
+		assert.strictEqual(previousDate, '2026-03-03');
+		assert.strictEqual(nextDate, '2026-03-03');
+		assert.strictEqual(nextEndDate, undefined);
+		assert.strictEqual(activeResizing, null);
+		assert.strictEqual(hover, null);
+		assert.strictEqual(isResizingRef.current, false);
 	} finally {
 		if (originalWindow) {
 			(globalThis as { window: typeof globalThis }).window = originalWindow;
@@ -115,6 +113,6 @@ void test('handleResizeStartFactory stores target segment and initial hover date
 
 	handleResizeStart(segment);
 
-	assert.equal(nextResizing, segment);
-	assert.equal(hover, '2026-03-04');
+	assert.strictEqual(nextResizing, segment);
+	assert.strictEqual(hover, '2026-03-04');
 });

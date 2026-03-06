@@ -1,12 +1,10 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	getMinutesFromPointer,
 	normalizeTimeSelection,
 	snapMinutes,
 } from '../../../shared/event/time-grid-interactions.ts';
 import { TIMELINE_SLOT_MINUTES } from '../../constants.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const rect = {
 	left: 100,
@@ -28,8 +26,8 @@ void test('normalizeTimelineTimeSelection uses timeline step and minimum duratio
 	);
 
 	assert.ok(range);
-	assert.equal(range.startMinutes, 9 * 60);
-	assert.equal(range.endMinutes, 9 * 60 + TIMELINE_SLOT_MINUTES);
+	assert.strictEqual(range.startMinutes, 9 * 60);
+	assert.strictEqual(range.endMinutes, 9 * 60 + TIMELINE_SLOT_MINUTES);
 });
 
 void test('resolveTimelineMinutesFromPointer snaps with timeline slot granularity', () => {
@@ -37,5 +35,5 @@ void test('resolveTimelineMinutesFromPointer snaps with timeline slot granularit
 		getMinutesFromPointer(241, rect, 14, TIMELINE_SLOT_MINUTES),
 		TIMELINE_SLOT_MINUTES,
 	);
-	assert.equal(minutes, 20);
+	assert.strictEqual(minutes, 20);
 });

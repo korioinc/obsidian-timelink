@@ -1,5 +1,8 @@
 import { normalizeHexColor } from '../../shared/color/normalize-hex-color';
 import {
+	type FrontmatterFileLike,
+	type FrontmatterMetadataApp,
+	type FrontmatterMutationApp,
 	readFrontmatterString,
 	removeFrontmatterKey,
 	setFrontmatterValue,
@@ -12,11 +15,10 @@ import {
 	extractFrontmatterBody,
 	parseFrontmatterValue,
 } from '../../shared/frontmatter/markdown-frontmatter';
-import type { App, TFile } from 'obsidian';
 
 function readBoardColorFromMetadata(
-	app: App,
-	file: TFile | null | undefined,
+	app: FrontmatterMetadataApp,
+	file: FrontmatterFileLike | null | undefined,
 	key: string,
 ): string | undefined {
 	if (!file) return undefined;
@@ -36,8 +38,8 @@ export function readBoardColorFromMarkdown(markdown: string, key: string): strin
 }
 
 export function resolveBoardColor(
-	app: App,
-	file: TFile | null | undefined,
+	app: FrontmatterMetadataApp,
+	file: FrontmatterFileLike | null | undefined,
 	markdown: string,
 	key: string,
 ): string | undefined {
@@ -45,8 +47,8 @@ export function resolveBoardColor(
 }
 
 export async function updateFrontmatterColor(
-	app: App,
-	file: TFile,
+	app: FrontmatterMutationApp,
+	file: FrontmatterFileLike,
 	key: string,
 	color: string | undefined,
 ): Promise<void> {

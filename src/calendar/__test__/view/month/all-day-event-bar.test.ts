@@ -1,7 +1,5 @@
-/* eslint-disable import/no-nodejs-modules */
 import { getMonthAllDayMarginClass } from '../../../utils/all-day-event-bar.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 type PlacementLike = {
 	spanInWeek: number;
@@ -16,7 +14,7 @@ void test('getMonthAllDayMarginClass returns symmetric margin for single-day pla
 		isSpanEnd: true,
 	};
 
-	assert.equal(getMonthAllDayMarginClass(placement), 'mx-1');
+	assert.strictEqual(getMonthAllDayMarginClass(placement), 'mx-1');
 });
 
 void test('getMonthAllDayMarginClass returns left-only margin for span start', () => {
@@ -26,7 +24,7 @@ void test('getMonthAllDayMarginClass returns left-only margin for span start', (
 		isSpanEnd: false,
 	};
 
-	assert.equal(getMonthAllDayMarginClass(placement), 'ml-1');
+	assert.strictEqual(getMonthAllDayMarginClass(placement), 'ml-1');
 });
 
 void test('getMonthAllDayMarginClass returns right-only margin for span end', () => {
@@ -36,7 +34,7 @@ void test('getMonthAllDayMarginClass returns right-only margin for span end', ()
 		isSpanEnd: true,
 	};
 
-	assert.equal(getMonthAllDayMarginClass(placement), 'mr-1');
+	assert.strictEqual(getMonthAllDayMarginClass(placement), 'mr-1');
 });
 
 void test('getMonthAllDayMarginClass returns no margin for middle span segment', () => {
@@ -46,5 +44,5 @@ void test('getMonthAllDayMarginClass returns no margin for middle span segment',
 		isSpanEnd: false,
 	};
 
-	assert.equal(getMonthAllDayMarginClass(placement), '');
+	assert.strictEqual(getMonthAllDayMarginClass(placement), '');
 });

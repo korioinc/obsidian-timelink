@@ -1,8 +1,12 @@
 import { TIMELINK_CARD_KEY } from '../../shared/frontmatter/timelink-frontmatter';
 import { extractFirstWikiLinkPath } from '../../shared/utils/wiki-link';
-import type { App } from 'obsidian';
 
 type Frontmatter = Record<string, unknown> | null | undefined;
+type LinkedCardLookupApp = {
+	metadataCache: {
+		getFirstLinkpathDest(path: string, sourcePath: string): { path: string } | null;
+	};
+};
 
 export const extractLinkedCardPathFromFrontmatter = (frontmatter: Frontmatter): string | null => {
 	const existingCardLink =
@@ -11,7 +15,7 @@ export const extractLinkedCardPathFromFrontmatter = (frontmatter: Frontmatter): 
 };
 
 export const resolveLinkedCardFileFromFrontmatter = (
-	app: App,
+	app: LinkedCardLookupApp,
 	sourcePath: string,
 	frontmatter: Frontmatter,
 ) => {

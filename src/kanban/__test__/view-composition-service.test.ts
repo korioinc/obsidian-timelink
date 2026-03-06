@@ -1,15 +1,13 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	buildKanbanViewState,
 	parseBoardStateFromViewData,
 	resolveKanbanViewMode,
 } from '../services/view-composition-service.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('parseBoardStateFromViewData returns null for non-kanban markdown', () => {
 	const markdown = ['---', 'title: note', '---', '', '# Note'].join('\n');
-	assert.equal(
+	assert.strictEqual(
 		parseBoardStateFromViewData({
 			app: {} as never,
 			file: null,
@@ -21,14 +19,14 @@ void test('parseBoardStateFromViewData returns null for non-kanban markdown', ()
 });
 
 void test('resolveKanbanViewMode returns fallback for unknown values', () => {
-	assert.equal(resolveKanbanViewMode('unknown', 'board'), 'board');
-	assert.equal(resolveKanbanViewMode(undefined, 'list'), 'list');
+	assert.strictEqual(resolveKanbanViewMode('unknown', 'board'), 'board');
+	assert.strictEqual(resolveKanbanViewMode(undefined, 'list'), 'list');
 });
 
 void test('resolveKanbanViewMode keeps supported modes', () => {
-	assert.equal(resolveKanbanViewMode('board', 'list'), 'board');
-	assert.equal(resolveKanbanViewMode('table', 'board'), 'table');
-	assert.equal(resolveKanbanViewMode('list', 'table'), 'list');
+	assert.strictEqual(resolveKanbanViewMode('board', 'list'), 'board');
+	assert.strictEqual(resolveKanbanViewMode('table', 'board'), 'table');
+	assert.strictEqual(resolveKanbanViewMode('list', 'table'), 'list');
 });
 
 void test('buildKanbanViewState includes file path only when provided', () => {

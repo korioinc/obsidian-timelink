@@ -1,7 +1,5 @@
-/* eslint-disable import/no-nodejs-modules */
 import { orderMoreMenuPlacements } from '../../../utils/more-menu-order.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 type Placement = {
 	id: string;

@@ -1,8 +1,6 @@
-/* eslint-disable import/no-nodejs-modules */
 import type { EventSegment } from '../../../types';
 import { buildMoreMenuEvents } from '../../../utils/more-menu-events.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createDateKeys = (count: number, startDay = 1): string[] =>
 	Array.from(

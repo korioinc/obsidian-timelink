@@ -1,13 +1,11 @@
-/* eslint-disable import/no-nodejs-modules */
 import { compareDateKey } from '../../event/model-utils.ts';
 import { normalizeDateRangeKeys, resolveRangeBounds } from '../../time-grid/overlay-range.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('compareDateKey compares lexicographical date keys', () => {
-	assert.equal(compareDateKey('2026-03-01', '2026-03-01'), 0);
-	assert.equal(compareDateKey('2026-03-01', '2026-03-02'), -1);
-	assert.equal(compareDateKey('2026-03-03', '2026-03-02'), 1);
+	assert.strictEqual(compareDateKey('2026-03-01', '2026-03-01'), 0);
+	assert.strictEqual(compareDateKey('2026-03-01', '2026-03-02'), -1);
+	assert.strictEqual(compareDateKey('2026-03-03', '2026-03-02'), 1);
 });
 
 void test('normalizeDateRangeKeys always returns sorted range', () => {
@@ -41,6 +39,6 @@ void test('resolveRangeBounds returns null when interval is fully outside', () =
 		'2026-04-01',
 		'2026-04-10',
 	);
-	assert.equal(before, null);
-	assert.equal(after, null);
+	assert.strictEqual(before, null);
+	assert.strictEqual(after, null);
 });

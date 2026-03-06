@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	clearActiveCardDrag,
 	getActiveCardDrag,
@@ -8,8 +7,7 @@ import {
 	setActiveCardDrag,
 	writeCardDragPayload,
 } from '../utils/card-dnd.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 type MockDataTransfer = {
 	effectAllowed: string;
@@ -46,7 +44,7 @@ void test('writeCardDragPayload + parseCardDragPayload roundtrip with mime paylo
 	writeCardDragPayload(dataTransfer as unknown as DataTransfer, payload);
 	const parsed = parseCardDragPayload(dataTransfer as unknown as DataTransfer);
 	assert.deepEqual(parsed, payload);
-	assert.equal(dataTransfer.effectAllowed, 'copyMove');
+	assert.strictEqual(dataTransfer.effectAllowed, 'copyMove');
 });
 
 void test('parseCardDragPayload falls back to active drag payload when transfer is empty', () => {
@@ -61,11 +59,11 @@ void test('markActiveCardDragHandled updates active state only for matching payl
 	clearActiveCardDrag();
 	setActiveCardDrag(payload);
 	markActiveCardDragHandled(payload);
-	assert.equal(getActiveCardDrag()?.handled, true);
+	assert.strictEqual(getActiveCardDrag()?.handled, true);
 
 	setActiveCardDrag(payload);
 	markActiveCardDragHandled({ ...payload, cardId: 'card-2' });
-	assert.equal(getActiveCardDrag()?.handled, false);
+	assert.strictEqual(getActiveCardDrag()?.handled, false);
 });
 
 void test('readOrderByDataAttr extracts stable order by dataset key', () => {

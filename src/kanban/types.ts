@@ -29,6 +29,10 @@ export interface KanbanBoard {
 	settings: KanbanBoardSettings;
 }
 
+export type RemoveCardOptions = {
+	deleteLinkedNote?: boolean;
+};
+
 export type KanbanRootActionHandlers = {
 	onCloseAddLaneForm: () => void;
 	onAddLane: (title: string) => Promise<void>;
@@ -39,7 +43,7 @@ export type KanbanRootActionHandlers = {
 	onReorderLanes: (order: string[]) => Promise<void>;
 	onAddCard: (laneId: string, title: string) => Promise<void>;
 	onUpdateLaneTitle: (laneId: string, title: string) => Promise<void>;
-	onRemoveCard: (cardId: string) => Promise<void>;
+	onRemoveCard: (cardId: string, options?: RemoveCardOptions) => Promise<void>;
 	onUpdateCardTitle: (cardId: string, title: string) => Promise<void>;
 	onMoveCard: (cardId: string, laneId: string, index: number) => Promise<void>;
 	onMoveCardFromOtherBoard: (

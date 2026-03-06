@@ -1,7 +1,5 @@
-/* eslint-disable import/no-nodejs-modules */
 import { getDateKeyFromPointerFactory } from '../../services/interaction/pointer.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createGridByIndex = () => Array.from({ length: 42 }, (_, index) => ({ key: `day-${index}` }));
 
@@ -10,7 +8,7 @@ void test('getDateKeyFromPointerFactory returns null when grid ref is missing', 
 		{ current: null },
 		createGridByIndex(),
 	);
-	assert.equal(getDateKeyFromPointer(200, 300), null);
+	assert.strictEqual(getDateKeyFromPointer(200, 300), null);
 });
 
 void test('getDateKeyFromPointerFactory resolves date key from pointer coordinates', () => {
@@ -29,7 +27,7 @@ void test('getDateKeyFromPointerFactory resolves date key from pointer coordinat
 		createGridByIndex(),
 	);
 	const resolved = getDateKeyFromPointer(250, 450);
-	assert.equal(resolved, 'day-15');
+	assert.strictEqual(resolved, 'day-15');
 });
 
 void test('getDateKeyFromPointerFactory returns null for invalid grid size', () => {
@@ -47,5 +45,5 @@ void test('getDateKeyFromPointerFactory returns null for invalid grid size', () 
 		},
 		createGridByIndex(),
 	);
-	assert.equal(getDateKeyFromPointer(200, 300), null);
+	assert.strictEqual(getDateKeyFromPointer(200, 300), null);
 });

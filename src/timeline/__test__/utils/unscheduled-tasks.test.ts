@@ -1,8 +1,6 @@
-/* eslint-disable import/no-nodejs-modules */
 import type { EventSegment } from '../../../shared/event/types';
 import { collectUnscheduledTasksForDay } from '../../utils/unscheduled-tasks.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 type SegmentOverrides = Omit<Partial<EventSegment>, 'event'> & {
 	event?: Partial<EventSegment['event']>;

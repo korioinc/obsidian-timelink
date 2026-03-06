@@ -1,12 +1,10 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	buildLinkedCardPathSet,
 	registerKanbanCardEventIndicatorRefresh,
 	shouldRefreshCardEventIndicators,
 } from '../services/event-indicator-refresh-service.ts';
 import type { KanbanBoard } from '../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 type MetadataEventName = 'changed' | 'deleted';
 type VaultEventName = 'rename';
@@ -143,13 +141,22 @@ void test('buildLinkedCardPathSet collects unique linked card paths from board t
 void test('shouldRefreshCardEventIndicators matches changed and renamed linked card paths', () => {
 	const linkedCardPaths = new Set(['cards/a.md']);
 
-	assert.equal(shouldRefreshCardEventIndicators('cards/a.md', undefined, linkedCardPaths), true);
-	assert.equal(
+	assert.strictEqual(
+		shouldRefreshCardEventIndicators('cards/a.md', undefined, linkedCardPaths),
+		true,
+	);
+	assert.strictEqual(
 		shouldRefreshCardEventIndicators('cards/new.md', 'cards/a.md', linkedCardPaths),
 		true,
 	);
-	assert.equal(shouldRefreshCardEventIndicators('cards/new.md', undefined, linkedCardPaths), false);
-	assert.equal(shouldRefreshCardEventIndicators(undefined, undefined, linkedCardPaths), false);
+	assert.strictEqual(
+		shouldRefreshCardEventIndicators('cards/new.md', undefined, linkedCardPaths),
+		false,
+	);
+	assert.strictEqual(
+		shouldRefreshCardEventIndicators(undefined, undefined, linkedCardPaths),
+		false,
+	);
 });
 
 void test('registerKanbanCardEventIndicatorRefresh reacts to metadata/vault changes of linked cards', () => {

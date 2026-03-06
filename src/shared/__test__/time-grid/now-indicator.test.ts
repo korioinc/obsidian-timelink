@@ -1,7 +1,5 @@
-/* eslint-disable import/no-nodejs-modules */
 import { deriveNowIndicatorState } from '../../time-grid/now-indicator.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('deriveNowIndicatorState returns today index visibility and nowTop', () => {
 	const dates = [new Date(2026, 2, 1), new Date(2026, 2, 2), new Date(2026, 2, 3)];
@@ -13,7 +11,7 @@ void test('deriveNowIndicatorState returns today index visibility and nowTop', (
 		slotHeight: 28,
 	});
 
-	assert.equal(state.todayIndex, 1);
-	assert.equal(state.showNowIndicator, true);
-	assert.equal(state.nowTop, 532);
+	assert.strictEqual(state.todayIndex, 1);
+	assert.strictEqual(state.showNowIndicator, true);
+	assert.strictEqual(state.nowTop, 532);
 });

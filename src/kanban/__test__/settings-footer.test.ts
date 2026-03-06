@@ -1,10 +1,8 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	extractSettingsFooterJson,
 	stripSettingsFooterFromLines,
 } from '../utils/settings-footer.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('extractSettingsFooterJson returns settings JSON text from footer block', () => {
 	const markdown = [
@@ -22,7 +20,7 @@ void test('extractSettingsFooterJson returns settings JSON text from footer bloc
 		'%%',
 	].join('\n');
 
-	assert.equal(extractSettingsFooterJson(markdown), '{"show-add-list":false}');
+	assert.strictEqual(extractSettingsFooterJson(markdown), '{"show-add-list":false}');
 });
 
 void test('stripSettingsFooterFromLines removes trailing settings footer block', () => {
@@ -51,6 +49,6 @@ void test('settings footer helpers ignore malformed footer structures', () => {
 		'%%',
 	].join('\n');
 
-	assert.equal(extractSettingsFooterJson(markdown), null);
+	assert.strictEqual(extractSettingsFooterJson(markdown), null);
 	assert.deepEqual(stripSettingsFooterFromLines(markdown.split('\n')), markdown.split('\n'));
 });

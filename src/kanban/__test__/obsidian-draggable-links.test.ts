@@ -1,12 +1,9 @@
-/* eslint-disable import/no-nodejs-modules, obsidianmd/no-tfile-tfolder-cast */
 import {
 	draggableToLinks,
 	getObsidianDraggable,
 	type ObsidianDraggable,
 } from '../utils/obsidian-drag-links.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import type { App, TFile } from 'obsidian';
+import { assert, test } from 'vitest';
 
 type LinkCall = {
 	filePath: string;
@@ -23,7 +20,7 @@ function createMockApp(initialDraggable?: ObsidianDraggable) {
 		},
 		fileManager: {
 			generateMarkdownLink: (
-				file: TFile,
+				file: { path: string },
 				sourcePath: string,
 				subpath: string,
 				displayText: string,
@@ -38,20 +35,20 @@ function createMockApp(initialDraggable?: ObsidianDraggable) {
 				return `[[${file.path}${suffix}|${displayText}]]`;
 			},
 		},
-	} as unknown as App;
+	};
 
 	return { app, calls };
 }
 
 void test('getObsidianDraggable returns draggable from dragManager', () => {
-	const file = { path: 'notes/task.md', basename: 'task' } as TFile;
+	const file = { path: 'notes/task.md', basename: 'task' };
 	const draggable: ObsidianDraggable = { type: 'file', file };
 	const { app } = createMockApp(draggable);
 	assert.deepEqual(getObsidianDraggable(app), draggable);
 });
 
 void test('draggableToLinks converts file draggable into markdown link', () => {
-	const file = { path: 'notes/task.md', basename: 'task' } as TFile;
+	const file = { path: 'notes/task.md', basename: 'task' };
 	const { app, calls } = createMockApp();
 	const links = draggableToLinks(app, 'boards/kanban.md', { type: 'file', file });
 
@@ -67,7 +64,7 @@ void test('draggableToLinks converts file draggable into markdown link', () => {
 });
 
 void test('draggableToLinks keeps parsed subpath for link draggable with file', () => {
-	const file = { path: 'notes/task.md', basename: 'task' } as TFile;
+	const file = { path: 'notes/task.md', basename: 'task' };
 	const { app, calls } = createMockApp();
 	const links = draggableToLinks(app, 'boards/kanban.md', {
 		type: 'link',

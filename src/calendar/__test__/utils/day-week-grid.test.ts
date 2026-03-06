@@ -1,12 +1,10 @@
-/* eslint-disable import/no-nodejs-modules */
 import { createTimedEventSegment as createSegment } from '../../../shared/__test__/helpers/event-factories.ts';
 import {
 	buildTimedPlacementsForDays,
 	deriveNowIndicator,
 	deriveTimedPlacementDays,
 } from '../../utils/day-week-grid.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('buildTimedPlacementsForDays maps single-day placement to provided dayOffset', () => {
 	const segment = createSegment({ date: '2026-03-01', startTime: '09:00', endTime: '10:00' });
@@ -19,10 +17,10 @@ void test('buildTimedPlacementsForDays maps single-day placement to provided day
 		timedDragRange: null,
 	});
 
-	assert.equal(placements.length, 1);
-	assert.equal(placements[0]?.dayOffset, 0);
-	assert.equal(placements[0]?.startMinutes, 9 * 60);
-	assert.equal(placements[0]?.endMinutes, 10 * 60);
+	assert.strictEqual(placements.length, 1);
+	assert.strictEqual(placements[0]?.dayOffset, 0);
+	assert.strictEqual(placements[0]?.startMinutes, 9 * 60);
+	assert.strictEqual(placements[0]?.endMinutes, 10 * 60);
 });
 
 void test('buildTimedPlacementsForDays expands cross-day timed event across mapped offsets', () => {
@@ -61,9 +59,9 @@ void test('deriveNowIndicator returns today index and nowTop using slot geometry
 		slotHeight: 28,
 	});
 
-	assert.equal(indicator.todayIndex, 1);
-	assert.equal(indicator.showNowIndicator, true);
-	assert.equal(indicator.nowTop, 532);
+	assert.strictEqual(indicator.todayIndex, 1);
+	assert.strictEqual(indicator.showNowIndicator, true);
+	assert.strictEqual(indicator.nowTop, 532);
 });
 
 void test('deriveNowIndicator hides indicator when no today exists in dates', () => {
@@ -76,8 +74,8 @@ void test('deriveNowIndicator hides indicator when no today exists in dates', ()
 		slotHeight: 28,
 	});
 
-	assert.equal(indicator.todayIndex, -1);
-	assert.equal(indicator.showNowIndicator, false);
+	assert.strictEqual(indicator.todayIndex, -1);
+	assert.strictEqual(indicator.showNowIndicator, false);
 });
 
 void test('deriveTimedPlacementDays maps dates to day keys with offsets', () => {

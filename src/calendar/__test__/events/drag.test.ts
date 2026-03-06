@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	beginDragFromPopoverFactory,
 	createDragCaptureHandlers,
@@ -7,8 +6,7 @@ import {
 	handleDropFactory,
 } from '../../services/interaction/drag.ts';
 import type { CalendarEvent, EventSegment } from '../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createSegment = (
 	eventOverrides: Partial<CalendarEvent> = {},
@@ -74,12 +72,12 @@ void test('handleDragStartFactory normalizes base dates and fallback hover key',
 		segment,
 	);
 
-	assert.equal(capturedStart, '2026-03-02');
-	assert.equal(capturedEnd, '2026-03-03');
-	assert.equal(capturedDate, '2026-03-02');
-	assert.equal(capturedEndDate, '2026-03-03');
-	assert.equal(nextHover, '2026-03-02');
-	assert.equal(didDropRef.current, false);
+	assert.strictEqual(capturedStart, '2026-03-02');
+	assert.strictEqual(capturedEnd, '2026-03-03');
+	assert.strictEqual(capturedDate, '2026-03-02');
+	assert.strictEqual(capturedEndDate, '2026-03-03');
+	assert.strictEqual(nextHover, '2026-03-02');
+	assert.strictEqual(didDropRef.current, false);
 });
 
 void test('handleDropFactory updates movable event and clears drag state', () => {
@@ -112,12 +110,12 @@ void test('handleDropFactory updates movable event and clears drag state', () =>
 
 	handleDrop('2026-03-04');
 
-	assert.equal(didDropRef.current, true);
-	assert.equal(clearedDragging, null);
-	assert.equal(clearedHover, null);
-	assert.equal(previousDate, '2026-03-01');
-	assert.equal(nextDate, '2026-03-04');
-	assert.equal(nextEndDate, '2026-03-05');
+	assert.strictEqual(didDropRef.current, true);
+	assert.strictEqual(clearedDragging, null);
+	assert.strictEqual(clearedHover, null);
+	assert.strictEqual(previousDate, '2026-03-01');
+	assert.strictEqual(nextDate, '2026-03-04');
+	assert.strictEqual(nextEndDate, '2026-03-05');
 });
 
 void test('handleDropFactory does not move event without date', () => {
@@ -146,10 +144,10 @@ void test('handleDropFactory does not move event without date', () => {
 
 	handleDrop('2026-03-03');
 
-	assert.equal(didDropRef.current, true);
-	assert.equal(moved, false);
-	assert.equal(clearedDragging, null);
-	assert.equal(clearedHover, null);
+	assert.strictEqual(didDropRef.current, true);
+	assert.strictEqual(moved, false);
+	assert.strictEqual(clearedDragging, null);
+	assert.strictEqual(clearedHover, null);
 });
 
 void test('handleDragEndFactory drops when hover date changed and no drop fired', () => {
@@ -177,10 +175,10 @@ void test('handleDragEndFactory drops when hover date changed and no drop fired'
 
 	handleDragEnd();
 
-	assert.equal(droppedTo, '2026-03-04');
-	assert.notEqual(clearedDragging, null);
-	assert.notEqual(clearedHover, null);
-	assert.equal(popoverDragRef.current, true);
+	assert.strictEqual(droppedTo, '2026-03-04');
+	assert.notStrictEqual(clearedDragging, null);
+	assert.notStrictEqual(clearedHover, null);
+	assert.strictEqual(popoverDragRef.current, true);
 });
 
 void test('beginDragFromPopoverFactory initializes drag state from popover source', () => {
@@ -209,12 +207,12 @@ void test('beginDragFromPopoverFactory initializes drag state from popover sourc
 
 	beginDrag({} as DragEvent, segment);
 
-	assert.equal(capturedStart, '2026-03-01');
-	assert.equal(capturedEnd, '2026-03-03');
-	assert.equal(nextHover, '2026-03-01');
-	assert.equal(didDropRef.current, false);
-	assert.equal(popoverDragRef.current, true);
-	assert.equal(createDragImageCalls, 1);
+	assert.strictEqual(capturedStart, '2026-03-01');
+	assert.strictEqual(capturedEnd, '2026-03-03');
+	assert.strictEqual(nextHover, '2026-03-01');
+	assert.strictEqual(didDropRef.current, false);
+	assert.strictEqual(popoverDragRef.current, true);
+	assert.strictEqual(createDragImageCalls, 1);
 });
 
 void test('createDragCaptureHandlers updates hover and forwards drop key', () => {
@@ -244,7 +242,7 @@ void test('createDragCaptureHandlers updates hover and forwards drop key', () =>
 	handlers.handleDragEnterCapture(event);
 	handlers.handleDropCapture(event);
 
-	assert.equal(prevented, 3);
-	assert.equal(hovered, '2026-03-05');
-	assert.equal(dropped, '2026-03-05');
+	assert.strictEqual(prevented, 3);
+	assert.strictEqual(hovered, '2026-03-05');
+	assert.strictEqual(dropped, '2026-03-05');
 });

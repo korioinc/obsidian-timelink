@@ -1,10 +1,8 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	createAllDayCellLayerStyle,
 	createAllDayGridColumnsStyle,
 } from '../../../_components/day-week/AllDayEventGrid.tsx';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('createAllDayGridColumnsStyle normalizes column count to at least one', () => {
 	assert.deepEqual(createAllDayGridColumnsStyle(7), {
