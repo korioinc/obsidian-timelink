@@ -1,8 +1,6 @@
-/* eslint-disable import/no-nodejs-modules */
 import { buildListSections } from '../../../hooks/use-list-sections.ts';
 import type { CalendarEvent, EventSegment } from '../../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createSegment = (
 	id: string,
@@ -48,10 +46,10 @@ void test('buildListSections groups segments by day inclusion range', () => {
 		],
 	);
 
-	assert.equal(sections[0]?.allDay.length, 1);
-	assert.equal(sections[0]?.timed.length, 1);
-	assert.equal(sections[1]?.allDay.length, 1);
-	assert.equal(sections[1]?.timed.length, 0);
+	assert.strictEqual(sections[0]?.allDay.length, 1);
+	assert.strictEqual(sections[0]?.timed.length, 1);
+	assert.strictEqual(sections[1]?.allDay.length, 1);
+	assert.strictEqual(sections[1]?.timed.length, 0);
 });
 
 void test('buildListSections sorts timed events by start time', () => {
@@ -88,6 +86,6 @@ void test('buildListSections falls back to date keys when segment indexes are st
 		],
 	);
 
-	assert.equal(sections[0]?.allDay.length, 1);
-	assert.equal(sections[1]?.allDay.length, 1);
+	assert.strictEqual(sections[0]?.allDay.length, 1);
+	assert.strictEqual(sections[1]?.allDay.length, 1);
 });

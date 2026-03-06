@@ -1,18 +1,14 @@
-/* eslint-disable import/no-nodejs-modules */
 import { findOpenKanbanLeafByPath } from '../services/card-service.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import type { WorkspaceLeaf } from 'obsidian';
+import { assert, test } from 'vitest';
 
-type MockLeaf = {
-	view: { file?: { path?: string } | null };
-	getViewState: () => { state?: { file?: string; filePath?: string } };
-};
+type MockLeaf = WorkspaceLeaf;
 
 function createLeaf(options: { viewPath?: string; statePath?: string }): MockLeaf {
 	return {
 		view: options.viewPath ? { file: { path: options.viewPath } } : {},
 		getViewState: () => ({ state: options.statePath ? { file: options.statePath } : {} }),
-	};
+	} as unknown as MockLeaf;
 }
 
 void test('findOpenKanbanLeafByPath matches leaf by active view file path', () => {
@@ -32,7 +28,7 @@ void test('findOpenKanbanLeafByPath matches leaf by active view file path', () =
 		'boards/b.md',
 	);
 
-	assert.equal(matched, leaves[1]);
+	assert.strictEqual(matched, leaves[1]);
 });
 
 void test('findOpenKanbanLeafByPath falls back to view state path', () => {
@@ -50,5 +46,5 @@ void test('findOpenKanbanLeafByPath falls back to view state path', () => {
 		'boards/state-only.md',
 	);
 
-	assert.equal(matched, leafByState);
+	assert.strictEqual(matched, leafByState);
 });

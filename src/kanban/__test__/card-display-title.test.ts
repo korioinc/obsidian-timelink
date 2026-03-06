@@ -1,25 +1,23 @@
-/* eslint-disable import/no-nodejs-modules */
 import { resolveCardDisplayTitle } from '../utils/card-display-title.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('resolveCardDisplayTitle returns plain title as-is', () => {
-	assert.equal(resolveCardDisplayTitle('레포 정리', 'fallback'), '레포 정리');
+	assert.strictEqual(resolveCardDisplayTitle('레포 정리', 'fallback'), '레포 정리');
 });
 
 void test('resolveCardDisplayTitle prefers wiki-link alias when present', () => {
-	assert.equal(
+	assert.strictEqual(
 		resolveCardDisplayTitle('[[1_재성이/attachments/test.md|재성이이잉]]', 'test'),
 		'재성이이잉',
 	);
 });
 
 void test('resolveCardDisplayTitle falls back to basename when alias is missing', () => {
-	assert.equal(resolveCardDisplayTitle('[[1_재성이/attachments/test.md]]', 'test'), 'test');
+	assert.strictEqual(resolveCardDisplayTitle('[[1_재성이/attachments/test.md]]', 'test'), 'test');
 });
 
 void test('resolveCardDisplayTitle keeps mixed non-link title text unchanged', () => {
-	assert.equal(
+	assert.strictEqual(
 		resolveCardDisplayTitle('작업 [[1_재성이/attachments/test.md|재성이이잉]]', 'test'),
 		'작업 [[1_재성이/attachments/test.md|재성이이잉]]',
 	);

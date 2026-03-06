@@ -1,8 +1,6 @@
-/* eslint-disable import/no-nodejs-modules */
 import { createAllDayEventSegment as createSegment } from '../../../shared/__test__/helpers/event-factories.ts';
 import { deriveDragAndResizeState } from '../../services/interaction/derivers.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const indexByDateKey = new Map([
 	['2026-03-01', 0],
@@ -22,8 +20,8 @@ void test('deriveDragAndResizeState calculates dragRange and dragHoverIndex for 
 	const state = deriveDragAndResizeState(dragging, '2026-03-04', null, null, indexByDateKey);
 
 	assert.deepEqual(state.dragRange, { start: '2026-03-04', end: '2026-03-05' });
-	assert.equal(state.dragHoverIndex, 3);
-	assert.equal(state.resizeRange, null);
+	assert.strictEqual(state.dragHoverIndex, 3);
+	assert.strictEqual(state.resizeRange, null);
 });
 
 void test('deriveDragAndResizeState clamps resize end when hover date is before start', () => {
@@ -33,8 +31,8 @@ void test('deriveDragAndResizeState clamps resize end when hover date is before 
 	);
 	const state = deriveDragAndResizeState(null, null, resizing, '2026-03-01', indexByDateKey);
 
-	assert.equal(state.dragRange, null);
-	assert.equal(state.dragHoverIndex, null);
+	assert.strictEqual(state.dragRange, null);
+	assert.strictEqual(state.dragHoverIndex, null);
 	assert.deepEqual(state.resizeRange, { start: '2026-03-03', end: '2026-03-03' });
 });
 
@@ -45,5 +43,5 @@ void test('deriveDragAndResizeState returns null hover index when date key is no
 	);
 	const state = deriveDragAndResizeState(dragging, '2026-04-01', null, null, indexByDateKey);
 
-	assert.equal(state.dragHoverIndex, null);
+	assert.strictEqual(state.dragHoverIndex, null);
 });

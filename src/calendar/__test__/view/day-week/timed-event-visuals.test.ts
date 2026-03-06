@@ -1,7 +1,5 @@
-/* eslint-disable import/no-nodejs-modules */
 import { deriveTimedEventVisualState } from '../../../../shared/event/timed-visual-model.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 type TimedEventVisualStateParams = Parameters<typeof deriveTimedEventVisualState>[0];
 
@@ -33,10 +31,10 @@ void test('deriveTimedEventVisualState uses drag range for labels and visual bou
 		}),
 	);
 
-	assert.equal(result.labelStartMinutes, 660);
-	assert.equal(result.labelEndMinutes, 750);
-	assert.equal(result.visualTop, (660 / 30) * 28);
-	assert.equal(result.visualHeight, 40);
+	assert.strictEqual(result.labelStartMinutes, 660);
+	assert.strictEqual(result.labelEndMinutes, 750);
+	assert.strictEqual(result.visualTop, (660 / 30) * 28);
+	assert.strictEqual(result.visualHeight, 40);
 });
 
 void test('deriveTimedEventVisualState applies same-day resize range', () => {
@@ -53,10 +51,10 @@ void test('deriveTimedEventVisualState applies same-day resize range', () => {
 		}),
 	);
 
-	assert.equal(result.labelStartMinutes, 540);
-	assert.equal(result.labelEndMinutes, 690);
-	assert.equal(result.visualTop, (540 / 30) * 28);
-	assert.equal(result.visualHeight, ((690 - 540) / 30) * 28);
+	assert.strictEqual(result.labelStartMinutes, 540);
+	assert.strictEqual(result.labelEndMinutes, 690);
+	assert.strictEqual(result.visualTop, (540 / 30) * 28);
+	assert.strictEqual(result.visualHeight, ((690 - 540) / 30) * 28);
 });
 
 void test('deriveTimedEventVisualState clamps out-of-range visual bounds', () => {
@@ -67,6 +65,6 @@ void test('deriveTimedEventVisualState clamps out-of-range visual bounds', () =>
 		}),
 	);
 
-	assert.equal(result.visualTop, 0);
-	assert.equal(result.visualHeight, (1440 / 30) * 28);
+	assert.strictEqual(result.visualTop, 0);
+	assert.strictEqual(result.visualHeight, (1440 / 30) * 28);
 });

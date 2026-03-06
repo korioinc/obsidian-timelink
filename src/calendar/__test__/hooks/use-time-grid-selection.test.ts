@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import { createPointerSelectionHandlers } from '../../../shared/hooks/time-grid-selection-handlers.ts';
 import {
 	deriveTimeSelectionStartState,
@@ -9,8 +8,7 @@ import {
 	resolveTimeSelectionPointerInfo,
 } from '../../../shared/hooks/use-time-grid-selection.ts';
 import type { TimeSelectionState } from '../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createTarget = () => {
 	const calls: number[] = [];
@@ -62,9 +60,9 @@ void test('resolveTimeSelectionPointerInfo maps pointer to date/minutes and targ
 	});
 
 	assert.ok(info);
-	assert.equal(info.dateKey, '2026-03-03');
-	assert.equal(info.minutes, 60);
-	assert.equal(info.target, target);
+	assert.strictEqual(info.dateKey, '2026-03-03');
+	assert.strictEqual(info.minutes, 60);
+	assert.strictEqual(info.target, target);
 });
 
 void test('deriveTimeSelectionStartState and patchTimeSelectionHover build expected state', () => {
@@ -78,10 +76,10 @@ void test('deriveTimeSelectionStartState and patchTimeSelectionHover build expec
 		hoverDateKey: '2026-03-01',
 		hoverMinutes: 9 * 60,
 	});
-	assert.equal(next.anchorDateKey, '2026-03-01');
-	assert.equal(next.anchorMinutes, 9 * 60);
-	assert.equal(next.hoverDateKey, '2026-03-02');
-	assert.equal(next.hoverMinutes, 10 * 60);
+	assert.strictEqual(next.anchorDateKey, '2026-03-01');
+	assert.strictEqual(next.anchorMinutes, 9 * 60);
+	assert.strictEqual(next.hoverDateKey, '2026-03-02');
+	assert.strictEqual(next.hoverMinutes, 10 * 60);
 });
 
 void test('createPointerSelectionHandlers pointer down starts selection and captures pointer', () => {
@@ -124,11 +122,11 @@ void test('createPointerSelectionHandlers pointer down starts selection and capt
 	handlers.handleTimeGridPointerDown(createPointerEvent({}, target));
 
 	assert.deepEqual(calls, [7]);
-	assert.equal(updates.length, 1);
-	assert.equal(updates[0]?.anchorDateKey, '2026-03-03');
-	assert.equal(updates[0]?.anchorMinutes, 60);
-	assert.equal(updates[0]?.hoverDateKey, '2026-03-03');
-	assert.equal(updates[0]?.hoverMinutes, 60);
+	assert.strictEqual(updates.length, 1);
+	assert.strictEqual(updates[0]?.anchorDateKey, '2026-03-03');
+	assert.strictEqual(updates[0]?.anchorMinutes, 60);
+	assert.strictEqual(updates[0]?.hoverDateKey, '2026-03-03');
+	assert.strictEqual(updates[0]?.hoverMinutes, 60);
 });
 
 void test('createPointerSelectionHandlers pointer move updates hover when selection is active', () => {
@@ -171,9 +169,9 @@ void test('createPointerSelectionHandlers pointer move updates hover when select
 		createPointerEvent({ clientX: 760, clientY: 340, pointerId: 11 }, target),
 	);
 
-	assert.equal(updates.length, 1);
+	assert.strictEqual(updates.length, 1);
 	const updater = updates[0];
-	assert.equal(typeof updater, 'function');
+	assert.strictEqual(typeof updater, 'function');
 	const next = (updater as (prev: TimeSelectionState) => TimeSelectionState)({
 		isSelecting: true,
 		anchorDateKey: '2026-03-01',
@@ -181,8 +179,8 @@ void test('createPointerSelectionHandlers pointer move updates hover when select
 		hoverDateKey: '2026-03-01',
 		hoverMinutes: 9 * 60,
 	});
-	assert.equal(next.hoverDateKey, '2026-03-07');
-	assert.equal(next.hoverMinutes, 150);
+	assert.strictEqual(next.hoverDateKey, '2026-03-07');
+	assert.strictEqual(next.hoverMinutes, 150);
 });
 
 void test('createPointerSelectionHandlers ignores blocked or non-primary pointer down', () => {
@@ -229,7 +227,7 @@ void test('createPointerSelectionHandlers ignores blocked or non-primary pointer
 	});
 	nonPrimaryHandlers.handleTimeGridPointerDown(createPointerEvent({ button: 1 }, target));
 
-	assert.equal(called, 0);
+	assert.strictEqual(called, 0);
 	assert.deepEqual(calls, []);
 });
 
@@ -241,8 +239,8 @@ void test('buildTimedCreateModalFromRange converts 24:00 boundary to next-day 00
 		endMinutes: 24 * 60,
 	});
 
-	assert.equal(modal.startDate, '2026-03-05');
-	assert.equal(modal.startTime, '23:30');
-	assert.equal(modal.endDate, '2026-03-06');
-	assert.equal(modal.endTime, '00:00');
+	assert.strictEqual(modal.startDate, '2026-03-05');
+	assert.strictEqual(modal.startTime, '23:30');
+	assert.strictEqual(modal.endDate, '2026-03-06');
+	assert.strictEqual(modal.endTime, '00:00');
 });

@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	getDateKeyFromPointer,
 	getMinutesFromPointer,
@@ -6,8 +5,7 @@ import {
 	normalizeTimeSelection,
 	snapMinutes,
 } from '../../../shared/event/time-grid-interactions.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const rect = {
 	left: 100,
@@ -38,23 +36,23 @@ void test('getDateKeyFromPointer resolves dynamic columns and clamps boundaries'
 	]);
 	const zeroWidth = getDateKeyFromPointer(300, { ...rect, width: 0 } as DOMRect, ['2026-03-01']);
 
-	assert.equal(single, '2026-03-01');
-	assert.equal(middle, '2026-03-03');
-	assert.equal(right, '2026-03-07');
-	assert.equal(zeroWidth, null);
+	assert.strictEqual(single, '2026-03-01');
+	assert.strictEqual(middle, '2026-03-03');
+	assert.strictEqual(right, '2026-03-07');
+	assert.strictEqual(zeroWidth, null);
 });
 
 void test('minute helpers snap and clamp pointer values', () => {
-	assert.equal(getMinutesFromY(275, rect.top, 28), 60);
-	assert.equal(getMinutesFromPointer(275, rect, 28), (75 / 28) * 30);
-	assert.equal(snapMinutes(77, 30), 60);
-	assert.equal(snapMinutes(2000, 30), 1440);
+	assert.strictEqual(getMinutesFromY(275, rect.top, 28), 60);
+	assert.strictEqual(getMinutesFromPointer(275, rect, 28), (75 / 28) * 30);
+	assert.strictEqual(snapMinutes(77, 30), 60);
+	assert.strictEqual(snapMinutes(2000, 30), 1440);
 });
 
 void test('minute helpers support custom step granularity', () => {
-	assert.equal(getMinutesFromY(275, rect.top, 28, 10), 20);
-	assert.equal(getMinutesFromPointer(275, rect, 28, 10), (75 / 28) * 10);
-	assert.equal(snapMinutes(77, 10), 70);
+	assert.strictEqual(getMinutesFromY(275, rect.top, 28, 10), 20);
+	assert.strictEqual(getMinutesFromPointer(275, rect, 28, 10), (75 / 28) * 10);
+	assert.strictEqual(snapMinutes(77, 10), 70);
 	const range = normalizeTimeSelection(
 		{
 			isSelecting: true,
@@ -66,8 +64,8 @@ void test('minute helpers support custom step granularity', () => {
 		10,
 	);
 	assert.ok(range);
-	assert.equal(range.startMinutes, 10 * 60);
-	assert.equal(range.endMinutes, 10 * 60 + 10);
+	assert.strictEqual(range.startMinutes, 10 * 60);
+	assert.strictEqual(range.endMinutes, 10 * 60 + 10);
 });
 
 void test('normalizeTimeSelection enforces minimum 30-minute range', () => {
@@ -80,10 +78,10 @@ void test('normalizeTimeSelection enforces minimum 30-minute range', () => {
 	});
 
 	assert.ok(range);
-	assert.equal(range.startDateKey, '2026-03-01');
-	assert.equal(range.endDateKey, '2026-03-01');
-	assert.equal(range.startMinutes, 10 * 60);
-	assert.equal(range.endMinutes, 10 * 60 + 30);
+	assert.strictEqual(range.startDateKey, '2026-03-01');
+	assert.strictEqual(range.endDateKey, '2026-03-01');
+	assert.strictEqual(range.startMinutes, 10 * 60);
+	assert.strictEqual(range.endMinutes, 10 * 60 + 30);
 });
 
 void test('normalizeTimeSelection clamps midnight anchor to the last valid start slot', () => {
@@ -96,10 +94,10 @@ void test('normalizeTimeSelection clamps midnight anchor to the last valid start
 	});
 
 	assert.ok(range);
-	assert.equal(range.startDateKey, '2026-03-01');
-	assert.equal(range.endDateKey, '2026-03-01');
-	assert.equal(range.startMinutes, 23 * 60 + 30);
-	assert.equal(range.endMinutes, 24 * 60);
+	assert.strictEqual(range.startDateKey, '2026-03-01');
+	assert.strictEqual(range.endDateKey, '2026-03-01');
+	assert.strictEqual(range.startMinutes, 23 * 60 + 30);
+	assert.strictEqual(range.endMinutes, 24 * 60);
 });
 
 void test('normalizeTimeSelection normalizes backward date selection', () => {
@@ -112,14 +110,14 @@ void test('normalizeTimeSelection normalizes backward date selection', () => {
 	});
 
 	assert.ok(range);
-	assert.equal(range.startDateKey, '2026-03-02');
-	assert.equal(range.endDateKey, '2026-03-03');
-	assert.equal(range.startMinutes, 9 * 60);
-	assert.equal(range.endMinutes, 10 * 60);
+	assert.strictEqual(range.startDateKey, '2026-03-02');
+	assert.strictEqual(range.endDateKey, '2026-03-03');
+	assert.strictEqual(range.startMinutes, 9 * 60);
+	assert.strictEqual(range.endMinutes, 10 * 60);
 });
 
 void test('normalizeTimeSelection returns null when anchor or hover is incomplete', () => {
-	assert.equal(
+	assert.strictEqual(
 		normalizeTimeSelection({
 			isSelecting: true,
 			anchorDateKey: null,

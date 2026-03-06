@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import type {
 	EditableEventResponse,
 	EventLocation,
@@ -10,8 +9,7 @@ import {
 	buildTimelineHeaderTitle,
 	buildTimelineTimedVisualModel,
 } from '../../services/model-service.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createLocation = (path: string): EventLocation => ({
 	file: { path },
@@ -33,12 +31,12 @@ const createEntry = (
 
 void test('buildTimelineHeaderTitle prepends today marker only for current day', () => {
 	const todayTitle = buildTimelineHeaderTitle(new Date());
-	assert.equal(todayTitle.startsWith('🟢 '), true);
+	assert.strictEqual(todayTitle.startsWith('🟢 '), true);
 
 	const nonToday = new Date();
 	nonToday.setDate(nonToday.getDate() - 2);
 	const nonTodayTitle = buildTimelineHeaderTitle(nonToday);
-	assert.equal(nonTodayTitle.startsWith('🟢 '), false);
+	assert.strictEqual(nonTodayTitle.startsWith('🟢 '), false);
 });
 
 void test('buildTimelineDayModel derives day key and unscheduled tasks for current day', () => {
@@ -51,8 +49,8 @@ void test('buildTimelineDayModel derives day key and unscheduled tasks for curre
 	];
 
 	const model = buildTimelineDayModel(entries, new Date(2026, 2, 2));
-	assert.equal(model.dayKey, '2026-03-02');
-	assert.equal(model.eventSegments.length, 2);
+	assert.strictEqual(model.dayKey, '2026-03-02');
+	assert.strictEqual(model.eventSegments.length, 2);
 	assert.deepEqual(
 		model.unscheduledTasks.map((segment) => segment.event.title),
 		['Task without time'],
@@ -91,7 +89,7 @@ void test('buildTimelineTimedVisualModel derives timed placements and now indica
 		slotHeight: TIMELINE_SLOT_HEIGHT,
 	});
 
-	assert.equal(visuals.timedEventsForDay.length, 1);
-	assert.equal(visuals.showNowIndicator, true);
-	assert.equal(visuals.nowTop, 798);
+	assert.strictEqual(visuals.timedEventsForDay.length, 1);
+	assert.strictEqual(visuals.showNowIndicator, true);
+	assert.strictEqual(visuals.nowTop, 798);
 });

@@ -1,7 +1,5 @@
-/* eslint-disable import/no-nodejs-modules */
 import { collectKanbanBoards } from '../services/model-service.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 type MockFile = {
 	path: string;
@@ -76,7 +74,7 @@ void test('collectKanbanBoards filters by depth, resolves colors, and sorts dete
 	const app = {
 		vault: {
 			getMarkdownFiles: () => files,
-			cachedRead: async (file: MockFile) => markdownByPath[file.path] ?? '',
+			cachedRead: (file: MockFile) => Promise.resolve(markdownByPath[file.path] ?? ''),
 		},
 		metadataCache: {
 			getFileCache: (file: MockFile) => cacheByPath[file.path],
@@ -84,13 +82,13 @@ void test('collectKanbanBoards filters by depth, resolves colors, and sorts dete
 	};
 
 	const items = await collectKanbanBoards(app as never, 1);
-	assert.equal(items.length, 4);
+	assert.strictEqual(items.length, 4);
 	assert.deepEqual(
 		items.map((item) => item.path),
 		['board-cached.md', 'folder/fallback.md', 'alpha.md', 'zeta.md'],
 	);
-	assert.equal(items[0]?.kanbanColor, '#1A2B3C');
-	assert.equal(items[1]?.kanbanColor, '#AABBCC');
-	assert.equal(items[2]?.kanbanColor, undefined);
-	assert.equal(items[3]?.kanbanColor, undefined);
+	assert.strictEqual(items[0]?.kanbanColor, '#1A2B3C');
+	assert.strictEqual(items[1]?.kanbanColor, '#AABBCC');
+	assert.strictEqual(items[2]?.kanbanColor, undefined);
+	assert.strictEqual(items[3]?.kanbanColor, undefined);
 });

@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	buildCardEventMap,
 	buildCardTitleMap,
@@ -7,8 +6,7 @@ import {
 	hasCard,
 } from '../services/model-service.ts';
 import type { KanbanBoard } from '../types.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 function createBoard(): KanbanBoard {
 	return {
@@ -38,37 +36,37 @@ function createBoard(): KanbanBoard {
 void test('findCardById returns card when card exists across lanes', () => {
 	const board = createBoard();
 	const card = findCardById(board, 'card-3');
-	assert.equal(card?.title, 'Done card');
+	assert.strictEqual(card?.title, 'Done card');
 });
 
 void test('findCardById returns null when card does not exist', () => {
 	const board = createBoard();
 	const card = findCardById(board, 'missing-card');
-	assert.equal(card, null);
+	assert.strictEqual(card, null);
 });
 
 void test('findCardBlockId returns blockId or null', () => {
 	const board = createBoard();
-	assert.equal(findCardBlockId(board, 'card-1'), 'block-1');
-	assert.equal(findCardBlockId(board, 'card-2'), null);
-	assert.equal(findCardBlockId(board, 'missing-card'), null);
+	assert.strictEqual(findCardBlockId(board, 'card-1'), 'block-1');
+	assert.strictEqual(findCardBlockId(board, 'card-2'), null);
+	assert.strictEqual(findCardBlockId(board, 'missing-card'), null);
 });
 
 void test('hasCard returns true only when card exists', () => {
 	const board = createBoard();
-	assert.equal(hasCard(board, 'card-2'), true);
-	assert.equal(hasCard(board, 'missing-card'), false);
+	assert.strictEqual(hasCard(board, 'card-2'), true);
+	assert.strictEqual(hasCard(board, 'missing-card'), false);
 });
 
 void test('buildCardTitleMap indexes card titles by id', () => {
 	const titles = buildCardTitleMap(createBoard());
-	assert.equal(titles.get('card-1'), 'First card');
-	assert.equal(titles.get('card-3'), 'Done card');
-	assert.equal(titles.get('missing'), undefined);
+	assert.strictEqual(titles.get('card-1'), 'First card');
+	assert.strictEqual(titles.get('card-3'), 'Done card');
+	assert.strictEqual(titles.get('missing'), undefined);
 });
 
 void test('buildCardEventMap delegates per-card event check and stores booleans', () => {
 	const eventMap = buildCardEventMap(createBoard(), (title) => title.includes('Done'));
-	assert.equal(eventMap.get('card-1'), false);
-	assert.equal(eventMap.get('card-3'), true);
+	assert.strictEqual(eventMap.get('card-1'), false);
+	assert.strictEqual(eventMap.get('card-3'), true);
 });

@@ -1,4 +1,5 @@
 import { normalizeHexColor } from '../../shared/color/normalize-hex-color';
+import type { EventLocation } from '../../shared/event/types';
 import { setFrontmatterValue } from '../../shared/frontmatter/file-frontmatter';
 import { KANBAN_BOARD_COLOR_KEY } from '../../shared/frontmatter/kanban-frontmatter';
 import type { KanbanBoard } from '../types';
@@ -23,6 +24,7 @@ type CalendarGateway = {
 			color?: string;
 			creator: 'kanban';
 		}) => Promise<{ file: { path: string } }>;
+		deleteEvent: (location: EventLocation) => Promise<void>;
 	};
 };
 

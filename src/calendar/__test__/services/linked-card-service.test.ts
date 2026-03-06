@@ -1,29 +1,27 @@
-/* eslint-disable import/no-nodejs-modules */
 import { TIMELINK_CARD_KEY } from '../../../shared/frontmatter/timelink-frontmatter';
 import {
 	extractLinkedCardPathFromFrontmatter,
 	resolveLinkedCardFileFromFrontmatter,
 } from '../../services/linked-card-service';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('extractLinkedCardPathFromFrontmatter returns first wikilink path', () => {
 	const frontmatter: Record<string, unknown> = {
 		[TIMELINK_CARD_KEY]: '[[Cards/My card|Card]]',
 	};
 
-	assert.equal(extractLinkedCardPathFromFrontmatter(frontmatter), 'Cards/My card');
+	assert.strictEqual(extractLinkedCardPathFromFrontmatter(frontmatter), 'Cards/My card');
 });
 
 void test('extractLinkedCardPathFromFrontmatter returns null for missing or invalid values', () => {
-	assert.equal(extractLinkedCardPathFromFrontmatter(undefined), null);
-	assert.equal(
+	assert.strictEqual(extractLinkedCardPathFromFrontmatter(undefined), null);
+	assert.strictEqual(
 		extractLinkedCardPathFromFrontmatter({
 			[TIMELINK_CARD_KEY]: 1,
 		}),
 		null,
 	);
-	assert.equal(
+	assert.strictEqual(
 		extractLinkedCardPathFromFrontmatter({
 			[TIMELINK_CARD_KEY]: '',
 		}),
@@ -36,8 +34,8 @@ void test('resolveLinkedCardFileFromFrontmatter resolves linked file via metadat
 	const app = {
 		metadataCache: {
 			getFirstLinkpathDest: (linkPath: string, sourcePath: string) => {
-				assert.equal(linkPath, 'Cards/My card');
-				assert.equal(sourcePath, 'Events/Example.md');
+				assert.strictEqual(linkPath, 'Cards/My card');
+				assert.strictEqual(sourcePath, 'Events/Example.md');
 				return expectedFile;
 			},
 		},
@@ -46,7 +44,7 @@ void test('resolveLinkedCardFileFromFrontmatter resolves linked file via metadat
 	const resolved = resolveLinkedCardFileFromFrontmatter(app as never, 'Events/Example.md', {
 		[TIMELINK_CARD_KEY]: '[[Cards/My card]]',
 	});
-	assert.equal(resolved, expectedFile);
+	assert.strictEqual(resolved, expectedFile);
 });
 
 void test('resolveLinkedCardFileFromFrontmatter returns null when card path is unavailable', () => {
@@ -58,5 +56,8 @@ void test('resolveLinkedCardFileFromFrontmatter returns null when card path is u
 		},
 	};
 
-	assert.equal(resolveLinkedCardFileFromFrontmatter(app as never, 'Events/Example.md', {}), null);
+	assert.strictEqual(
+		resolveLinkedCardFileFromFrontmatter(app as never, 'Events/Example.md', {}),
+		null,
+	);
 });

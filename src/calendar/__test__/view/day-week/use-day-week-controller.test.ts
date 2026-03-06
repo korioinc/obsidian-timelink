@@ -1,11 +1,9 @@
-/* eslint-disable import/no-nodejs-modules */
 import { deriveSelectionEndIndexForMode, deriveTimedDatesForMode } from '../../../types.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('deriveSelectionEndIndexForMode returns day/week end boundaries', () => {
-	assert.equal(deriveSelectionEndIndexForMode('day'), 0);
-	assert.equal(deriveSelectionEndIndexForMode('week'), 6);
+	assert.strictEqual(deriveSelectionEndIndexForMode('day'), 0);
+	assert.strictEqual(deriveSelectionEndIndexForMode('week'), 6);
 });
 
 void test('deriveTimedDatesForMode returns single date for day mode', () => {
@@ -14,8 +12,8 @@ void test('deriveTimedDatesForMode returns single date for day mode', () => {
 		date: first,
 	});
 
-	assert.equal(dates.length, 1);
-	assert.equal(dates[0]?.getTime(), first.getTime());
+	assert.strictEqual(dates.length, 1);
+	assert.strictEqual(dates[0]?.getTime(), first.getTime());
 });
 
 void test('deriveTimedDatesForMode returns all grid dates for week mode', () => {
@@ -25,7 +23,7 @@ void test('deriveTimedDatesForMode returns all grid dates for week mode', () => 
 		date: first,
 	});
 
-	assert.equal(dates.length, 2);
-	assert.equal(dates[0]?.getTime(), first.getTime());
-	assert.equal(dates[1]?.getTime(), second.getTime());
+	assert.strictEqual(dates.length, 2);
+	assert.strictEqual(dates[0]?.getTime(), first.getTime());
+	assert.strictEqual(dates[1]?.getTime(), second.getTime());
 });

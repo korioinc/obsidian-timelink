@@ -2,6 +2,8 @@ import { CALENDAR_VIEW_TYPE } from './calendar/constants';
 import { TimeLinkCalendar } from './calendar/services/model-service';
 import { TimeLinkCalendarView } from './calendar/view.tsx';
 import { registerKanbanCommands } from './commands/kanban';
+import { GANTT_VIEW_ICON, GANTT_VIEW_TYPE } from './gantt/constants';
+import { TimeLinkGanttView } from './gantt/view/index';
 import { KANBAN_LIST_VIEW_ICON, KANBAN_LIST_VIEW_TYPE } from './kanban-list/constants';
 import { TimeLinkKanbanListView } from './kanban-list/view/index';
 import { KANBAN_ICON, KANBAN_VIEW_TYPE } from './kanban/constants';
@@ -26,6 +28,7 @@ export default class TimeLinkPlugin extends Plugin {
 	private kanbanLeafFilePaths = new Map<string, string>();
 	private kanbanRibbonIcon: HTMLElement | null = null;
 	private kanbanListRibbonIcon: HTMLElement | null = null;
+	private ganttRibbonIcon: HTMLElement | null = null;
 	getTodayDateKey(): string {
 		return formatDateKey(new Date());
 	}
@@ -35,6 +38,7 @@ export default class TimeLinkPlugin extends Plugin {
 
 		this.registerView(CALENDAR_VIEW_TYPE, (leaf) => new TimeLinkCalendarView(leaf, this));
 		this.registerView(TIMELINE_VIEW_TYPE, (leaf) => new TimeLinkTimelineView(leaf, this));
+		this.registerView(GANTT_VIEW_TYPE, (leaf) => new TimeLinkGanttView(leaf, this));
 		this.registerView(KANBAN_LIST_VIEW_TYPE, (leaf) => new TimeLinkKanbanListView(leaf, this));
 
 		this.registerExtensions(['kanban'], 'markdown');
@@ -214,6 +218,31 @@ export default class TimeLinkPlugin extends Plugin {
 		void this.app.workspace.revealLeaf(leaf);
 	}
 
+	private async openGanttView(): Promise<void> {
+		const leaves = this.app.workspace.getLeavesOfType(GANTT_VIEW_TYPE);
+		const existingLeaf = leaves[0];
+		if (existingLeaf) {
+			void this.app.workspace.revealLeaf(existingLeaf);
+			return;
+		}
+		const leaf = this.app.workspace.getLeaf('tab') ?? this.app.workspace.getRightLeaf(false);
+		if (!leaf) {
+			new Notice('Unable to open gantt view.');
+			return;
+		}
+		await leaf.setViewState({ type: GANTT_VIEW_TYPE, active: true });
+		void this.app.workspace.revealLeaf(leaf);
+	}
+
+	async openKanbanBoard(boardPath: string): Promise<void> {
+		const target = this.app.vault.getAbstractFileByPath(boardPath);
+		if (!(target instanceof TFile)) {
+			new Notice('Kanban board file not found.');
+			return;
+		}
+		await this.kanbanManager.openBoard(target);
+	}
+
 	private async openKanbanListView(): Promise<void> {
 		const leaves = this.app.workspace.getLeavesOfType(KANBAN_LIST_VIEW_TYPE);
 		const existingLeaf = leaves[0];
@@ -252,6 +281,7 @@ export default class TimeLinkPlugin extends Plugin {
 		this.kanbanLeafFilePaths.clear();
 		this.removeKanbanRibbonIcon();
 		this.removeKanbanListRibbonIcon();
+		this.removeGanttRibbonIcon();
 	}
 
 	async setMarkdownView(leaf: WorkspaceLeaf): Promise<void> {
@@ -334,10 +364,12 @@ export default class TimeLinkPlugin extends Plugin {
 			this.kanbanLeafFilePaths.clear();
 			this.removeKanbanRibbonIcon();
 			this.removeKanbanListRibbonIcon();
+			this.removeGanttRibbonIcon();
 			return;
 		}
 		this.ensureKanbanRibbonIcon();
 		this.ensureKanbanListRibbonIcon();
+		this.ensureGanttRibbonIcon();
 		await this.restoreKanbanLeaves();
 	}
 
@@ -359,6 +391,13 @@ export default class TimeLinkPlugin extends Plugin {
 		);
 	}
 
+	private ensureGanttRibbonIcon(): void {
+		if (this.ganttRibbonIcon) return;
+		this.ganttRibbonIcon = this.addRibbonIcon(GANTT_VIEW_ICON, 'Open gantt', () => {
+			void this.openGanttView();
+		});
+	}
+
 	private removeKanbanRibbonIcon(): void {
 		if (!this.kanbanRibbonIcon) return;
 		this.kanbanRibbonIcon.remove();
@@ -369,5 +408,11 @@ export default class TimeLinkPlugin extends Plugin {
 		if (!this.kanbanListRibbonIcon) return;
 		this.kanbanListRibbonIcon.remove();
 		this.kanbanListRibbonIcon = null;
+	}
+
+	private removeGanttRibbonIcon(): void {
+		if (!this.ganttRibbonIcon) return;
+		this.ganttRibbonIcon.remove();
+		this.ganttRibbonIcon = null;
 	}
 }

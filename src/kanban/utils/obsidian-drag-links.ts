@@ -1,19 +1,34 @@
 import { extractWikiLinkSubpath } from '../../shared/utils/wiki-link';
-import type { App, TFile } from 'obsidian';
+
+type DraggableFile = {
+	path: string;
+	basename: string;
+};
+type DraggableApp = {
+	dragManager?: { draggable?: unknown };
+	fileManager: {
+		generateMarkdownLink(
+			file: DraggableFile,
+			sourcePath: string,
+			subpath: string,
+			alias: string,
+		): string;
+	};
+};
 
 export type ObsidianDraggable =
-	| { type: 'file'; file: TFile }
-	| { type: 'files'; files: TFile[] }
-	| { type: 'link'; linktext: string; file?: TFile };
+	| { type: 'file'; file: DraggableFile }
+	| { type: 'files'; files: DraggableFile[] }
+	| { type: 'link'; linktext: string; file?: DraggableFile };
 
-export function getObsidianDraggable(app: App): ObsidianDraggable | null {
-	const dragManager = (app as App & { dragManager?: { draggable?: unknown } }).dragManager;
+export function getObsidianDraggable(app: DraggableApp): ObsidianDraggable | null {
+	const dragManager = app.dragManager;
 	if (!dragManager) return null;
 	return (dragManager.draggable as ObsidianDraggable | undefined) ?? null;
 }
 
 export function draggableToLinks(
-	app: App,
+	app: DraggableApp,
 	sourcePath: string,
 	draggable: ObsidianDraggable | null,
 ): string[] {

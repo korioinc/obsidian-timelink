@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	addCard,
 	addLane,
@@ -12,8 +11,7 @@ import {
 	updateLaneTitle,
 } from '../services/model-service.ts';
 import type { KanbanBoard } from '../types.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 function createBoard(): KanbanBoard {
 	return {
@@ -43,8 +41,8 @@ function createBoard(): KanbanBoard {
 void test('insertCardAt clamps index and inserts normalized title', () => {
 	const board = createBoard();
 	const next = insertCardAt(board, 'lane-b', 999, { title: '  New card\r\nline2  ' });
-	assert.equal(next.lanes[1]?.cards.length, 1);
-	assert.equal(next.lanes[1]?.cards[0]?.title, 'New card\nline2');
+	assert.strictEqual(next.lanes[1]?.cards.length, 1);
+	assert.strictEqual(next.lanes[1]?.cards[0]?.title, 'New card\nline2');
 });
 
 void test('moveCard relocates card across lanes at clamped index', () => {
@@ -63,26 +61,26 @@ void test('moveCard relocates card across lanes at clamped index', () => {
 void test('lane and card operations preserve behavior for add/update/remove', () => {
 	const board = createBoard();
 	const addedLane = addLane(board, 'In review');
-	assert.equal(addedLane.lanes.length, 3);
+	assert.strictEqual(addedLane.lanes.length, 3);
 
 	const updatedLane = updateLaneTitle(addedLane, 'lane-a', 'Todo updated');
-	assert.equal(updatedLane.lanes[0]?.title, 'Todo updated');
+	assert.strictEqual(updatedLane.lanes[0]?.title, 'Todo updated');
 
 	const addedCard = addCard(updatedLane, 'lane-b', 'Newly done');
-	assert.equal(addedCard.lanes[1]?.cards.length, 1);
+	assert.strictEqual(addedCard.lanes[1]?.cards.length, 1);
 
 	const updatedCard = updateCardTitle(
 		addedCard,
 		addedCard.lanes[1]?.cards[0]?.id ?? '',
 		' Edited ',
 	);
-	assert.equal(updatedCard.lanes[1]?.cards[0]?.title, 'Edited');
+	assert.strictEqual(updatedCard.lanes[1]?.cards[0]?.title, 'Edited');
 
 	const removedCard = removeCard(updatedCard, addedCard.lanes[1]?.cards[0]?.id ?? '');
-	assert.equal(removedCard.lanes[1]?.cards.length, 0);
+	assert.strictEqual(removedCard.lanes[1]?.cards.length, 0);
 
 	const removedLane = removeLane(removedCard, 'lane-b');
-	assert.equal(removedLane.lanes.length, 2);
+	assert.strictEqual(removedLane.lanes.length, 2);
 });
 
 void test('reorderLanesByOrder preserves unspecified lanes at the end', () => {

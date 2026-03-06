@@ -1,4 +1,6 @@
 import {
+	type FrontmatterFileLike,
+	type FrontmatterMetadataApp,
 	readFrontmatterString,
 	readFrontmatterValue,
 } from '../../shared/frontmatter/file-frontmatter';
@@ -10,6 +12,11 @@ import { isKanbanBoard, parseKanbanBoard, serializeKanbanBoard } from './parser-
 import type { App, TFile, WorkspaceLeaf } from 'obsidian';
 
 type VaultFileLike = { path: string };
+type CardLookupApp = FrontmatterMetadataApp & {
+	metadataCache: FrontmatterMetadataApp['metadataCache'] & {
+		getFirstLinkpathDest(path: string, sourcePath: string): unknown;
+	};
+};
 type VaultApi = {
 	getAbstractFileByPath(path: string): unknown;
 	read(file: VaultFileLike): Promise<string>;
@@ -31,7 +38,7 @@ function isTFileLike(file: unknown): file is TFile {
 }
 
 export function resolveLinkedCardFile(
-	app: App,
+	app: CardLookupApp,
 	sourceFilePath: string,
 	title: string,
 ): TFile | null {
@@ -44,7 +51,7 @@ export function resolveLinkedCardFile(
 }
 
 export function hasCardLinkedEvent(
-	app: App,
+	app: CardLookupApp,
 	sourceFilePath: string,
 	title: string,
 	cardEventProperty: string,
@@ -55,15 +62,15 @@ export function hasCardLinkedEvent(
 }
 
 export function cardFileHasEventLink(
-	app: App,
-	cardFile: TFile,
+	app: FrontmatterMetadataApp,
+	cardFile: FrontmatterFileLike,
 	cardEventProperty: string,
 ): boolean {
 	return readFrontmatterString(app, cardFile, cardEventProperty) !== null;
 }
 
 export function resolveEventCardBacklinkFromCardTitle(
-	app: App,
+	app: CardLookupApp,
 	sourceFilePath: string,
 	title: string,
 	cardEventProperty: string,
@@ -81,7 +88,7 @@ export function resolveEventCardBacklinkFromCardTitle(
 }
 
 export function collectLinkedEventFiles(
-	app: App,
+	app: CardLookupApp,
 	board: KanbanBoard,
 	sourceFilePath: string,
 	cardEventProperty: string,

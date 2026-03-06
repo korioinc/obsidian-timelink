@@ -1,10 +1,8 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	deriveTimeSelectionPointerState,
 	deriveTimedPointerState,
 } from '../../../shared/event/time-grid-interactions.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const rect = {
 	left: 100,
@@ -24,8 +22,8 @@ void test('deriveTimedPointerState resolves single-day date key and snapped minu
 	});
 
 	assert.ok(state);
-	assert.equal(state.dateKey, '2026-03-01');
-	assert.equal(state.minutes, 60);
+	assert.strictEqual(state.dateKey, '2026-03-01');
+	assert.strictEqual(state.minutes, 60);
 });
 
 void test('deriveTimedPointerState resolves week column date key', () => {
@@ -47,8 +45,8 @@ void test('deriveTimedPointerState resolves week column date key', () => {
 	});
 
 	assert.ok(state);
-	assert.equal(state.dateKey, '2026-03-03');
-	assert.equal(state.minutes, 150);
+	assert.strictEqual(state.dateKey, '2026-03-03');
+	assert.strictEqual(state.minutes, 150);
 });
 
 void test('deriveTimedPointerState returns null when width is zero', () => {
@@ -61,7 +59,7 @@ void test('deriveTimedPointerState returns null when width is zero', () => {
 		slotMinutes: 30,
 	});
 
-	assert.equal(state, null);
+	assert.strictEqual(state, null);
 });
 
 void test('deriveTimeSelectionPointerState returns date key and grid-snapped minutes', () => {
@@ -82,6 +80,6 @@ void test('deriveTimeSelectionPointerState returns date key and grid-snapped min
 	});
 
 	assert.ok(state);
-	assert.equal(state.dateKey, '2026-03-07');
-	assert.equal(state.minutes, 90);
+	assert.strictEqual(state.dateKey, '2026-03-07');
+	assert.strictEqual(state.minutes, 90);
 });

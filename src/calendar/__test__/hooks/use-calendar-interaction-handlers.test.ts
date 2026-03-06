@@ -1,12 +1,10 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	createAllDayEventSegment as createSegment,
 	createEventModalState as createModalState,
 } from '../../../shared/__test__/helpers/event-factories.ts';
 import { createEventInteractionHandlers } from '../../../shared/event/interaction-handlers.ts';
 import type { CalendarEvent, CreateEventState, EventModalState, EventSegment } from '../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createCalendarInteractionHandlers = (params: {
 	modal: EventModalState | null;
@@ -96,9 +94,9 @@ void test('createCalendarInteractionHandlers opens create modal on date click wh
 	handlers.handleDateClick('2026-03-05');
 
 	assert.ok(createModalState);
-	assert.equal(createStartDate, '2026-03-05');
-	assert.equal(createEndDate, '');
-	assert.equal(createAllDay, true);
+	assert.strictEqual(createStartDate, '2026-03-05');
+	assert.strictEqual(createEndDate, '');
+	assert.strictEqual(createAllDay, true);
 });
 
 void test('createCalendarInteractionHandlers event click closes selection and opens edit modal', () => {
@@ -144,12 +142,12 @@ void test('createCalendarInteractionHandlers event click closes selection and op
 
 	handlers.handleEventClick(segment);
 
-	assert.equal(endSelectionCount, 1);
+	assert.strictEqual(endSelectionCount, 1);
 	assert.ok(modalState);
-	assert.equal(modalTitle, 'Clicked');
-	assert.equal(modalAllDay, false);
-	assert.equal(modalStartTime, '09:00');
-	assert.equal(modalEndTime, '10:00');
+	assert.strictEqual(modalTitle, 'Clicked');
+	assert.strictEqual(modalAllDay, false);
+	assert.strictEqual(modalStartTime, '09:00');
+	assert.strictEqual(modalEndTime, '10:00');
 });
 
 void test('createCalendarInteractionHandlers modal save reports notice for empty title', () => {
@@ -188,5 +186,5 @@ void test('createCalendarInteractionHandlers modal save reports notice for empty
 		color: '',
 	});
 
-	assert.equal(noticeMessage, 'Please enter a title.');
+	assert.strictEqual(noticeMessage, 'Please enter a title.');
 });

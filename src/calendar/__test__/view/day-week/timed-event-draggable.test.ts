@@ -1,8 +1,6 @@
-/* eslint-disable import/no-nodejs-modules */
 import { canMoveEvent } from '../../../../shared/event/event-sync.ts';
 import type { CalendarEvent, EventSegment } from '../../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createSegment = (
 	eventOverrides: Partial<CalendarEvent> = {},
@@ -36,10 +34,10 @@ const createSegment = (
 
 void test('canMoveEvent returns true when event has date', () => {
 	const segment = createSegment({ date: '2026-03-01' });
-	assert.equal(canMoveEvent(segment.event), true);
+	assert.strictEqual(canMoveEvent(segment.event), true);
 });
 
 void test('canMoveEvent returns false when event has no date', () => {
 	const segment = createSegment({ date: undefined, startDate: '2026-03-01' });
-	assert.equal(canMoveEvent(segment.event), false);
+	assert.strictEqual(canMoveEvent(segment.event), false);
 });

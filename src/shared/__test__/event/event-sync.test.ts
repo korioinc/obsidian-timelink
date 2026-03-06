@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	applyOptimisticMove,
 	rollbackOptimisticMove,
@@ -6,8 +5,7 @@ import {
 	updateEventLocation,
 } from '../../event/event-sync.ts';
 import type { EditableEventResponse } from '../../event/types.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createEntry = (title: string, path: string, lineNumber?: number): EditableEventResponse => [
 	{
@@ -28,7 +26,7 @@ void test('updateEventLocation matches equivalent locations even when object ref
 	const previous = { file: { path: 'calendar/a.md' }, lineNumber: undefined };
 	const next = { file: { path: 'calendar/b.md' }, lineNumber: undefined };
 	const updated = updateEventLocation(events, previous, next);
-	assert.equal(updated[0]?.[1].file.path, 'calendar/b.md');
+	assert.strictEqual(updated[0]?.[1].file.path, 'calendar/b.md');
 });
 
 void test('updateEventEntry matches equivalent locations by value', () => {
@@ -38,8 +36,8 @@ void test('updateEventEntry matches equivalent locations by value', () => {
 	const next = { file: { path: 'calendar/b.md' }, lineNumber: undefined };
 	const updatedEvent = { ...entry[0], title: 'After' };
 	const updated = updateEventEntry(events, previous, next, updatedEvent);
-	assert.equal(updated[0]?.[0].title, 'After');
-	assert.equal(updated[0]?.[1].file.path, 'calendar/b.md');
+	assert.strictEqual(updated[0]?.[0].title, 'After');
+	assert.strictEqual(updated[0]?.[1].file.path, 'calendar/b.md');
 });
 
 void test('rollbackOptimisticMove restores original event with equivalent location values', () => {
@@ -49,6 +47,6 @@ void test('rollbackOptimisticMove restores original event with equivalent locati
 		file: { path: 'calendar/original.md' },
 		lineNumber: undefined,
 	});
-	assert.equal(restored[0]?.[0].title, 'Before');
-	assert.equal(restored[0]?.[1].file.path, 'calendar/original.md');
+	assert.strictEqual(restored[0]?.[0].title, 'Before');
+	assert.strictEqual(restored[0]?.[1].file.path, 'calendar/original.md');
 });

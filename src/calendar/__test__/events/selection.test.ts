@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	createSelectionHandlers,
 	createSelectionPointerUpHandler,
@@ -7,8 +6,7 @@ import {
 } from '../../services/interaction/selection.ts';
 import type { SelectionState } from '../../services/interaction/selection.ts';
 import type { CreateEventState } from '../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('createSelectionHandlers begins, updates, and ends normalized selection range', () => {
 	let selection: SelectionState = EMPTY_SELECTION;
@@ -18,23 +16,23 @@ void test('createSelectionHandlers begins, updates, and ends normalized selectio
 	const { beginSelection, updateSelection, endSelection } = createSelectionHandlers(setSelection);
 
 	beginSelection('2026-03-03');
-	assert.equal(selection.isSelecting, true);
-	assert.equal(selection.anchorDateKey, '2026-03-03');
-	assert.equal(selection.startDateKey, '2026-03-03');
-	assert.equal(selection.endDateKey, '2026-03-03');
+	assert.strictEqual(selection.isSelecting, true);
+	assert.strictEqual(selection.anchorDateKey, '2026-03-03');
+	assert.strictEqual(selection.startDateKey, '2026-03-03');
+	assert.strictEqual(selection.endDateKey, '2026-03-03');
 
 	updateSelection('2026-03-01');
-	assert.equal(selection.hoverDateKey, '2026-03-01');
-	assert.equal(selection.startDateKey, '2026-03-01');
-	assert.equal(selection.endDateKey, '2026-03-03');
+	assert.strictEqual(selection.hoverDateKey, '2026-03-01');
+	assert.strictEqual(selection.startDateKey, '2026-03-01');
+	assert.strictEqual(selection.endDateKey, '2026-03-03');
 
 	endSelection();
 	assert.deepEqual(selection, EMPTY_SELECTION);
 });
 
 void test('isSelectionActive only returns true for selecting state with anchor', () => {
-	assert.equal(isSelectionActive(EMPTY_SELECTION), false);
-	assert.equal(
+	assert.strictEqual(isSelectionActive(EMPTY_SELECTION), false);
+	assert.strictEqual(
 		isSelectionActive({
 			...EMPTY_SELECTION,
 			isSelecting: true,
@@ -42,7 +40,7 @@ void test('isSelectionActive only returns true for selecting state with anchor',
 		}),
 		false,
 	);
-	assert.equal(
+	assert.strictEqual(
 		isSelectionActive({
 			...EMPTY_SELECTION,
 			isSelecting: true,
@@ -85,15 +83,15 @@ void test('createSelectionPointerUpHandler opens all-day create modal and clears
 	if (!createdModal) {
 		throw new Error('create modal was not set');
 	}
-	assert.equal(modalStartDate, '2026-03-01');
-	assert.equal(modalEndDate, '');
-	assert.equal(modalAllDay, true);
-	assert.equal(endSelectionCalls, 1);
+	assert.strictEqual(modalStartDate, '2026-03-01');
+	assert.strictEqual(modalEndDate, '');
+	assert.strictEqual(modalAllDay, true);
+	assert.strictEqual(endSelectionCalls, 1);
 
 	selection = {
 		...EMPTY_SELECTION,
 		isSelecting: true,
 	};
 	handlePointerUp();
-	assert.equal(endSelectionCalls, 2);
+	assert.strictEqual(endSelectionCalls, 2);
 });

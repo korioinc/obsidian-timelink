@@ -1,7 +1,5 @@
-/* eslint-disable import/no-nodejs-modules */
 import { deriveAllDayLayoutMetrics } from '../../../utils/all-day-layout.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('deriveAllDayLayoutMetrics keeps at least one row and computes total height', () => {
 	const result = deriveAllDayLayoutMetrics({
@@ -11,9 +9,9 @@ void test('deriveAllDayLayoutMetrics keeps at least one row and computes total h
 		requestedCapacity: 1,
 	});
 
-	assert.equal(result.rowCount, 1);
-	assert.equal(result.gridTemplateRows, 'repeat(1, 20px)');
-	assert.equal(result.totalHeight, 28);
+	assert.strictEqual(result.rowCount, 1);
+	assert.strictEqual(result.gridTemplateRows, 'repeat(1, 20px)');
+	assert.strictEqual(result.totalHeight, 28);
 });
 
 void test('deriveAllDayLayoutMetrics respects minimum row count override', () => {
@@ -25,7 +23,7 @@ void test('deriveAllDayLayoutMetrics respects minimum row count override', () =>
 		minimumRowCount: 2,
 	});
 
-	assert.equal(result.rowCount, 2);
-	assert.equal(result.gridTemplateRows, 'repeat(2, 20px)');
-	assert.equal(result.totalHeight, 50);
+	assert.strictEqual(result.rowCount, 2);
+	assert.strictEqual(result.gridTemplateRows, 'repeat(2, 20px)');
+	assert.strictEqual(result.totalHeight, 50);
 });

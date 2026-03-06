@@ -1,11 +1,9 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	extractWikiLinkPath,
 	extractWikiLinkSubpath,
 	parseWikiLinkParts,
 } from '../../shared/utils/wiki-link.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('parseWikiLinkParts parses path, subpath, and alias', () => {
 	assert.deepEqual(parseWikiLinkParts('project/note#Heading|Alias'), {
@@ -24,12 +22,12 @@ void test('parseWikiLinkParts supports wrapped wikilink text', () => {
 });
 
 void test('extractWikiLinkPath returns null for empty/invalid input', () => {
-	assert.equal(extractWikiLinkPath(''), null);
-	assert.equal(extractWikiLinkPath('   '), null);
-	assert.equal(extractWikiLinkPath('|alias'), null);
+	assert.strictEqual(extractWikiLinkPath(''), null);
+	assert.strictEqual(extractWikiLinkPath('   '), null);
+	assert.strictEqual(extractWikiLinkPath('|alias'), null);
 });
 
 void test('extractWikiLinkSubpath returns empty string when no subpath exists', () => {
-	assert.equal(extractWikiLinkSubpath('project/note'), '');
-	assert.equal(extractWikiLinkSubpath('project/note|Alias'), '');
+	assert.strictEqual(extractWikiLinkSubpath('project/note'), '');
+	assert.strictEqual(extractWikiLinkSubpath('project/note|Alias'), '');
 });

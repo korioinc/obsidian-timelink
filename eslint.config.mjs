@@ -1,3 +1,5 @@
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
+import eslintJson from '@eslint/json';
 import tsparser from '@typescript-eslint/parser';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
@@ -22,7 +24,7 @@ export default tseslint.config(
 			},
 			parserOptions: {
 				projectService: {
-					allowDefaultProject: ['eslint.config.mjs', 'manifest.json'],
+					allowDefaultProject: ['eslint.config.mjs', 'manifest.json', 'vitest.config.ts'],
 				},
 				tsconfigRootDir: __dirname,
 				extraFileExtensions: ['.json'],
@@ -35,16 +37,22 @@ export default tseslint.config(
 		languageOptions: {
 			parser: tsparser,
 			parserOptions: {
+				// Keep projectService in the shared block above; typescript-eslint treats
+				// parserOptions.project and parserOptions.projectService as alternatives.
 				tsconfigRootDir: __dirname,
 			},
 		},
 		plugins: {
+			'eslint-comments': eslintComments,
 			obsidianmd,
 			import: importPlugin,
 			prettier,
 			promise: pluginPromise,
 		},
 		rules: {
+			'@typescript-eslint/require-await': 'error',
+			'eslint-comments/disable-enable-pair': 'error',
+			'eslint-comments/no-restricted-disable': ['error', 'obsidianmd/no-tfile-tfolder-cast'],
 			'prettier/prettier': 'error',
 		},
 	},
@@ -55,6 +63,18 @@ export default tseslint.config(
 		},
 		rules: {
 			'prettier/prettier': 'error',
+		},
+	},
+	{
+		files: ['manifest.json'],
+		language: 'json/json',
+		plugins: {
+			json: eslintJson,
+			obsidianmd,
+		},
+		rules: {
+			'no-irregular-whitespace': 'off',
+			'obsidianmd/validate-manifest': 'error',
 		},
 	},
 	{

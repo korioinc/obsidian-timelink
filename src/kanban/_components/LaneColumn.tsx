@@ -124,6 +124,7 @@ export function LaneColumn({
 		showCardMenu({
 			app: markdownContext.app,
 			event,
+			sourcePath: markdownContext.sourcePath,
 			cardId,
 			title,
 			onStartEdit: startEditCard,

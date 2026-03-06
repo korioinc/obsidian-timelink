@@ -1,10 +1,8 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	buildBoundedRangeSegments,
 	buildSingleColumnSegments,
 } from '../../time-grid/overlay-segments.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('buildSingleColumnSegments returns empty when range start is different date', () => {
 	const segments = buildSingleColumnSegments('2026-03-02', {

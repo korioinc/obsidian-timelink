@@ -1,25 +1,23 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	extractFirstWikiLinkPath,
 	extractWikiLinkPath,
 	extractWikiLinkSubpath,
 	parseWikiLinkParts,
 } from '../../utils/wiki-link.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('extractFirstWikiLinkPath parses first wikilink path with alias/subpath', () => {
-	assert.equal(extractFirstWikiLinkPath('[[folder/task|Alias]]'), 'folder/task');
-	assert.equal(
+	assert.strictEqual(extractFirstWikiLinkPath('[[folder/task|Alias]]'), 'folder/task');
+	assert.strictEqual(
 		extractFirstWikiLinkPath('prefix [[folder/task#section|Alias]] suffix'),
 		'folder/task',
 	);
 });
 
 void test('extractFirstWikiLinkPath returns null when wikilink is missing or invalid', () => {
-	assert.equal(extractFirstWikiLinkPath('plain text'), null);
-	assert.equal(extractFirstWikiLinkPath('[[|Alias]]'), null);
-	assert.equal(extractFirstWikiLinkPath(undefined), null);
+	assert.strictEqual(extractFirstWikiLinkPath('plain text'), null);
+	assert.strictEqual(extractFirstWikiLinkPath('[[|Alias]]'), null);
+	assert.strictEqual(extractFirstWikiLinkPath(undefined), null);
 });
 
 void test('parseWikiLinkParts parses path, subpath, and alias', () => {
@@ -36,8 +34,8 @@ void test('parseWikiLinkParts parses path, subpath, and alias', () => {
 });
 
 void test('extractWikiLinkPath and extractWikiLinkSubpath return normalized values', () => {
-	assert.equal(extractWikiLinkPath('project/note#Heading|Alias'), 'project/note');
-	assert.equal(extractWikiLinkSubpath('project/note#Heading|Alias'), '#Heading');
-	assert.equal(extractWikiLinkPath('|Alias'), null);
-	assert.equal(extractWikiLinkSubpath('project/note|Alias'), '');
+	assert.strictEqual(extractWikiLinkPath('project/note#Heading|Alias'), 'project/note');
+	assert.strictEqual(extractWikiLinkSubpath('project/note#Heading|Alias'), '#Heading');
+	assert.strictEqual(extractWikiLinkPath('|Alias'), null);
+	assert.strictEqual(extractWikiLinkSubpath('project/note|Alias'), '');
 });

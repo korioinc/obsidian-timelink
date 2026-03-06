@@ -1,12 +1,10 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	getShiftedDateRange,
 	isDateKeyInRange,
 	resolveNormalizedEventDateRange,
 } from '../../event/date-range.ts';
 import type { CalendarEvent } from '../../event/types.ts';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 const createEvent = (overrides: Partial<CalendarEvent>): CalendarEvent => ({
 	title: 'Event',
@@ -20,7 +18,7 @@ const createEvent = (overrides: Partial<CalendarEvent>): CalendarEvent => ({
 
 void test('resolveNormalizedEventDateRange returns null when date is missing', () => {
 	const range = resolveNormalizedEventDateRange(createEvent({ date: undefined }));
-	assert.equal(range, null);
+	assert.strictEqual(range, null);
 });
 
 void test('resolveNormalizedEventDateRange treats next-day 00:00 as exclusive for timed events', () => {
@@ -52,7 +50,7 @@ void test('getShiftedDateRange keeps span while moving to target start key', () 
 
 void test('isDateKeyInRange includes boundaries and excludes outside keys', () => {
 	const range = { startKey: '2026-03-03', endKey: '2026-03-05' };
-	assert.equal(isDateKeyInRange('2026-03-03', range), true);
-	assert.equal(isDateKeyInRange('2026-03-05', range), true);
-	assert.equal(isDateKeyInRange('2026-03-06', range), false);
+	assert.strictEqual(isDateKeyInRange('2026-03-03', range), true);
+	assert.strictEqual(isDateKeyInRange('2026-03-05', range), true);
+	assert.strictEqual(isDateKeyInRange('2026-03-06', range), false);
 });

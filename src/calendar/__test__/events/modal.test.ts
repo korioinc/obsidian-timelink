@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules */
 import {
 	createAllDayEventSegment as createSegment,
 	createEventModalState as createModalState,
@@ -11,8 +10,7 @@ import {
 	handleToggleCompletedFactory,
 } from '../../../shared/event/modal-interaction.ts';
 import type { CalendarEvent, CreateEventState, EventSegment } from '../../types';
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { assert, test } from 'vitest';
 
 void test('handleToggleCompletedFactory toggles task event completion only', () => {
 	let savedCount = 0;
@@ -24,11 +22,11 @@ void test('handleToggleCompletedFactory toggles task event completion only', () 
 	const handleToggleCompleted = handleToggleCompletedFactory(onSave);
 
 	handleToggleCompleted(createSegment({ taskEvent: true, completed: false }));
-	assert.equal(savedCount, 1);
-	assert.equal(nextCompleted, true);
+	assert.strictEqual(savedCount, 1);
+	assert.strictEqual(nextCompleted, true);
 
 	handleToggleCompleted(createSegment({ taskEvent: false, completed: false }));
-	assert.equal(savedCount, 1);
+	assert.strictEqual(savedCount, 1);
 });
 
 void test('handleDateClickFactory closes open more menu and blocks create when dragging', () => {
@@ -48,8 +46,8 @@ void test('handleDateClickFactory closes open more menu and blocks create when d
 
 	handler('2026-03-05');
 
-	assert.equal(closeCount, 0);
-	assert.equal(createCount, 0);
+	assert.strictEqual(closeCount, 0);
+	assert.strictEqual(createCount, 0);
 });
 
 void test('handleDateClickFactory opens create modal when menu is not open', () => {
@@ -70,9 +68,9 @@ void test('handleDateClickFactory opens create modal when menu is not open', () 
 
 	handler('2026-03-05');
 
-	assert.equal(startDate, '2026-03-05');
-	assert.equal(endDate, '');
-	assert.equal(allDay, true);
+	assert.strictEqual(startDate, '2026-03-05');
+	assert.strictEqual(endDate, '');
+	assert.strictEqual(allDay, true);
 });
 
 void test('handleModalSaveFactory validates draft and normalizes saved event', () => {
@@ -127,8 +125,8 @@ void test('handleModalSaveFactory validates draft and normalizes saved event', (
 		endTime: '10:00',
 		color: '#ABCDEF',
 	});
-	assert.equal(noticeMessage, 'Please enter a title.');
-	assert.equal(saveCount, 0);
+	assert.strictEqual(noticeMessage, 'Please enter a title.');
+	assert.strictEqual(saveCount, 0);
 
 	noticeMessage = '';
 	handleModalSave({
@@ -141,8 +139,8 @@ void test('handleModalSaveFactory validates draft and normalizes saved event', (
 		endTime: '10:00',
 		color: '#ABCDEF',
 	});
-	assert.equal(noticeMessage, 'Start and end times are required for timed events.');
-	assert.equal(saveCount, 0);
+	assert.strictEqual(noticeMessage, 'Start and end times are required for timed events.');
+	assert.strictEqual(saveCount, 0);
 
 	handleModalSave({
 		title: 'After',
@@ -154,14 +152,14 @@ void test('handleModalSaveFactory validates draft and normalizes saved event', (
 		endTime: '',
 		color: 'blue',
 	});
-	assert.equal(saveCount, 1);
-	assert.equal(savedDate, '2026-03-05');
-	assert.equal(savedEndDate, undefined);
-	assert.equal(savedStartTime, undefined);
-	assert.equal(savedEndTime, undefined);
-	assert.equal(savedColor, undefined);
-	assert.equal(savedCompleted, true);
-	assert.equal(modalClosed, true);
+	assert.strictEqual(saveCount, 1);
+	assert.strictEqual(savedDate, '2026-03-05');
+	assert.strictEqual(savedEndDate, undefined);
+	assert.strictEqual(savedStartTime, undefined);
+	assert.strictEqual(savedEndTime, undefined);
+	assert.strictEqual(savedColor, undefined);
+	assert.strictEqual(savedCompleted, true);
+	assert.strictEqual(modalClosed, true);
 });
 
 void test('handleCreateSaveFactory validates and creates normalized timed event', () => {
@@ -213,8 +211,8 @@ void test('handleCreateSaveFactory validates and creates normalized timed event'
 		endTime: '10:00',
 		color: '#abc',
 	});
-	assert.equal(noticeMessage, 'Please enter a title.');
-	assert.equal(createCount, 0);
+	assert.strictEqual(noticeMessage, 'Please enter a title.');
+	assert.strictEqual(createCount, 0);
 
 	noticeMessage = '';
 	handleCreateSave({
@@ -227,8 +225,8 @@ void test('handleCreateSaveFactory validates and creates normalized timed event'
 		endTime: '11:00',
 		color: '#abc',
 	});
-	assert.equal(noticeMessage, 'Start and end times are required for timed events.');
-	assert.equal(createCount, 0);
+	assert.strictEqual(noticeMessage, 'Start and end times are required for timed events.');
+	assert.strictEqual(createCount, 0);
 
 	handleCreateSave({
 		title: 'Created',
@@ -241,13 +239,13 @@ void test('handleCreateSaveFactory validates and creates normalized timed event'
 		color: '#abc',
 	});
 
-	assert.equal(createCount, 1);
-	assert.equal(createdDate, '2026-03-05');
-	assert.equal(createdEndDate, '2026-03-06');
-	assert.equal(createdStartTime, '09:30');
-	assert.equal(createdEndTime, '11:00');
-	assert.equal(createdColor, '#AABBCC');
-	assert.equal(closed, true);
+	assert.strictEqual(createCount, 1);
+	assert.strictEqual(createdDate, '2026-03-05');
+	assert.strictEqual(createdEndDate, '2026-03-06');
+	assert.strictEqual(createdStartTime, '09:30');
+	assert.strictEqual(createdEndTime, '11:00');
+	assert.strictEqual(createdColor, '#AABBCC');
+	assert.strictEqual(closed, true);
 });
 
 void test('createGridEventClickHandler normalizes legacy 24:00 modal end time to next-day 00:00', () => {
@@ -273,6 +271,6 @@ void test('createGridEventClickHandler normalizes legacy 24:00 modal end time to
 
 	handler(segment);
 
-	assert.equal(modalEndTime, '00:00');
-	assert.equal(modalEndDate, '2026-03-06');
+	assert.strictEqual(modalEndTime, '00:00');
+	assert.strictEqual(modalEndDate, '2026-03-06');
 });

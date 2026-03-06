@@ -1,4 +1,3 @@
-/* eslint-disable import/no-nodejs-modules, obsidianmd/no-tfile-tfolder-cast */
 import {
 	TIMELINK_CARD_KEY,
 	TIMELINK_EVENT_KEY,
@@ -7,37 +6,37 @@ import {
 	clearLinkedCardEventBacklink,
 	syncLinkedCardEventBacklink,
 } from '../../services/event-card-backlink-service';
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import type { App, TFile } from 'obsidian';
+import type { App } from 'obsidian';
+import { assert, test } from 'vitest';
 
 const createMockApp = (
-	cardFile: TFile | null,
+	cardFile: { path: string } | null,
 	frontmatterByPath: Record<string, Record<string, unknown>>,
 ): App =>
 	({
 		metadataCache: {
 			getFirstLinkpathDest: (linkPath: string, sourcePath: string) => {
-				assert.equal(linkPath, 'Cards/Backlog card');
-				assert.equal(sourcePath, 'Events/2026-03-05 test.md');
+				assert.strictEqual(linkPath, 'Cards/Backlog card');
+				assert.strictEqual(sourcePath, 'Events/2026-03-05 test.md');
 				return cardFile;
 			},
 		},
 		fileManager: {
-			processFrontMatter: async (
-				file: TFile,
+			processFrontMatter: (
+				file: { path: string },
 				updater: (frontmatter: Record<string, unknown>) => void,
 			) => {
 				const nextFrontmatter = frontmatterByPath[file.path] ?? {};
 				frontmatterByPath[file.path] = nextFrontmatter;
 				updater(nextFrontmatter);
+				return Promise.resolve();
 			},
-			generateMarkdownLink: (file: TFile) => `[[${file.path}|Event title]]`,
+			generateMarkdownLink: (file: { path: string }) => `[[${file.path}|Event title]]`,
 		},
 	}) as unknown as App;
 
 void test('clearLinkedCardEventBacklink removes event link from linked card frontmatter', async () => {
-	const cardFile = { path: 'Cards/Backlog card.md' } as TFile;
+	const cardFile = { path: 'Cards/Backlog card.md' };
 	const frontmatterByPath: Record<string, Record<string, unknown>> = {
 		[cardFile.path]: {
 			[TIMELINK_EVENT_KEY]: '[[Events/old.md|Old]]',
@@ -49,12 +48,12 @@ void test('clearLinkedCardEventBacklink removes event link from linked card fron
 		[TIMELINK_CARD_KEY]: '[[Cards/Backlog card]]',
 	});
 
-	assert.equal(frontmatterByPath[cardFile.path]?.[TIMELINK_EVENT_KEY], undefined);
+	assert.strictEqual(frontmatterByPath[cardFile.path]?.[TIMELINK_EVENT_KEY], undefined);
 });
 
 void test('syncLinkedCardEventBacklink writes updated event link to linked card frontmatter', async () => {
-	const cardFile = { path: 'Cards/Backlog card.md' } as TFile;
-	const eventFile = { path: 'Events/2026-03-05 test.md' } as TFile;
+	const cardFile = { path: 'Cards/Backlog card.md' };
+	const eventFile = { path: 'Events/2026-03-05 test.md' };
 	const frontmatterByPath: Record<string, Record<string, unknown>> = {
 		[cardFile.path]: {},
 	};
@@ -70,7 +69,7 @@ void test('syncLinkedCardEventBacklink writes updated event link to linked card 
 		},
 	});
 
-	assert.equal(
+	assert.strictEqual(
 		frontmatterByPath[cardFile.path]?.[TIMELINK_EVENT_KEY],
 		'[[Events/2026-03-05 test.md|Event title]]',
 	);
@@ -85,7 +84,7 @@ void test('event-card backlink helpers no-op when linked card does not exist', a
 	});
 	await syncLinkedCardEventBacklink({
 		app,
-		eventFile: { path: 'Events/2026-03-05 test.md' } as TFile,
+		eventFile: { path: 'Events/2026-03-05 test.md' },
 		sourcePath: 'Events/2026-03-05 test.md',
 		eventTitle: 'Event title',
 		frontmatter: {
