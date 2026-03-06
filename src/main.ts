@@ -1,21 +1,20 @@
-import { TimeLinkCalendar } from './calendar/calendar';
 import { CALENDAR_VIEW_TYPE } from './calendar/constants';
-import { formatDateKey } from './calendar/utils/month-calendar-utils';
-import { TimeLinkCalendarView } from './calendar/view';
+import { TimeLinkCalendar } from './calendar/services/model-service';
+import { TimeLinkCalendarView } from './calendar/view.tsx';
 import { registerKanbanCommands } from './commands/kanban';
 import { KANBAN_LIST_VIEW_ICON, KANBAN_LIST_VIEW_TYPE } from './kanban-list/constants';
-import { TimeLinkKanbanListView } from './kanban-list/view';
+import { TimeLinkKanbanListView } from './kanban-list/view/index';
+import { KANBAN_ICON, KANBAN_VIEW_TYPE } from './kanban/constants';
+import { KanbanManager } from './kanban/services/manager-service';
+import { openCreateKanbanModal } from './kanban/view/modal';
+import { DEFAULT_SETTINGS, TimeLinkSettingTab, TimeLinkSettings } from './settings';
+import { formatDateKey } from './shared/event/model-utils';
 import {
 	KANBAN_FRONTMATTER_KEY,
 	KANBAN_FRONTMATTER_VALUE,
-	KANBAN_ICON,
-	KANBAN_VIEW_TYPE,
-} from './kanban/constants';
-import { KanbanManager } from './kanban/manager';
-import { openCreateKanbanModal } from './kanban/modal';
-import { DEFAULT_SETTINGS, TimeLinkSettingTab, TimeLinkSettings } from './settings';
+} from './shared/frontmatter/kanban-frontmatter';
 import { TIMELINE_VIEW_ICON, TIMELINE_VIEW_TYPE } from './timeline/constants';
-import { TimeLinkTimelineView } from './timeline/view';
+import { TimeLinkTimelineView } from './timeline/view.tsx';
 import { around } from './utils/around';
 import { MarkdownView, Menu, Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from 'obsidian';
 

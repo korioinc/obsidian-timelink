@@ -1,8 +1,5 @@
-import type { EventSegment } from '../../calendar/types';
-import {
-	DEFAULT_EVENT_COLOR,
-	normalizeEventColor,
-} from '../../calendar/utils/month-calendar-utils';
+import { DEFAULT_EVENT_COLOR, normalizeEventColor } from '../../shared/event/model-utils';
+import type { EventSegment } from '../../shared/event/types';
 import type { JSX } from 'preact';
 
 type TimelineUnscheduledTasksProps = {
