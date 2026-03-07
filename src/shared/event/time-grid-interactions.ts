@@ -10,7 +10,13 @@ import {
 	toMinutes,
 } from './model-utils';
 import { getShiftedTimedRange } from './shifted-timed-range';
-import type { CalendarEvent, EventSegment, TimeSelectionRange, TimeSelectionState } from './types';
+import type {
+	CalendarEvent,
+	EventSegment,
+	TimeSelectionRange,
+	TimeSelectionState,
+	TimedDragAnchor,
+} from './types';
 
 export type DateKeyGridCell = { key: string };
 
@@ -106,13 +112,29 @@ const shiftDateKey = (dateKey: string, days: number): string => {
 };
 
 const normalizeBoundaryDateAndMinutes = (dateKey: string, minutes: number) => {
-	const safeMinutes = Math.max(0, minutes);
-	const dayOffset = Math.floor(safeMinutes / MINUTES_IN_DAY);
-	const normalizedMinutes = safeMinutes - dayOffset * MINUTES_IN_DAY;
+	const dayOffset = Math.floor(minutes / MINUTES_IN_DAY);
+	const normalizedMinutes = minutes - dayOffset * MINUTES_IN_DAY;
 	return {
 		dateKey: shiftDateKey(dateKey, dayOffset),
 		minutes: normalizedMinutes,
 	};
+};
+
+const resolveTimedEventStartBoundary = (segment: EventSegment) => ({
+	dateKey: segment.event.date ?? segment.start,
+	minutes: toMinutes(segment.event.startTime) ?? 0,
+});
+
+const getTimedDragAnchorOffsetMinutes = (
+	segment: EventSegment,
+	dragAnchor: TimedDragAnchor,
+): number => {
+	const actualStart = resolveTimedEventStartBoundary(segment);
+	return (
+		diffInDays(parseDateKey(actualStart.dateKey), parseDateKey(dragAnchor.dateKey)) *
+			MINUTES_IN_DAY +
+		(dragAnchor.startMinutes - actualStart.minutes)
+	);
 };
 
 export const normalizeTimeSelection = (
@@ -256,6 +278,23 @@ export const deriveTimedDragRange = (
 		startMinutes,
 		endMinutes,
 	};
+};
+
+export const resolveTimedDragHoverState = (
+	timedDragging: EventSegment,
+	hoverDateKey: string,
+	hoverMinutes: number,
+	dragAnchor?: TimedDragAnchor | null,
+) => {
+	if (!dragAnchor) {
+		return {
+			dateKey: hoverDateKey,
+			minutes: hoverMinutes,
+		};
+	}
+
+	const anchorOffsetMinutes = getTimedDragAnchorOffsetMinutes(timedDragging, dragAnchor);
+	return normalizeBoundaryDateAndMinutes(hoverDateKey, hoverMinutes - anchorOffsetMinutes);
 };
 
 export const buildTimedDragDropEvent = (

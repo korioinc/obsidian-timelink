@@ -1,5 +1,6 @@
 import { toMinutes } from './model-utils';
-import type { EventSegment } from './types';
+import { resolveTimedDragHoverState } from './time-grid-interactions';
+import type { EventSegment, TimedDragAnchor } from './types';
 
 type TimedResizeStartState = {
 	hoverDateKey: string;
@@ -19,11 +20,22 @@ export const deriveTimedResizeStartState = (segment: EventSegment): TimedResizeS
 	color: segment.event.color ?? null,
 });
 
-export const deriveTimedDragStartState = (segment: EventSegment): TimedDragStartState => ({
-	hoverDateKey: segment.start,
-	hoverMinutes: toMinutes(segment.event.startTime) ?? 0,
-	color: segment.event.color ?? null,
-});
+export const deriveTimedDragStartState = (
+	segment: EventSegment,
+	dragAnchor?: TimedDragAnchor | null,
+): TimedDragStartState => {
+	const baseState = dragAnchor
+		? resolveTimedDragHoverState(segment, dragAnchor.dateKey, dragAnchor.startMinutes, dragAnchor)
+		: {
+				dateKey: segment.start,
+				minutes: toMinutes(segment.event.startTime) ?? 0,
+			};
+	return {
+		hoverDateKey: baseState.dateKey,
+		hoverMinutes: baseState.minutes,
+		color: segment.event.color ?? null,
+	};
+};
 
 export const resolveTimedColor = (
 	previewColor: string | null,

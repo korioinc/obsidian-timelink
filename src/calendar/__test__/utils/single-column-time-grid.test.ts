@@ -1,4 +1,5 @@
 import {
+	buildSingleColumnTimedDragAnchor,
 	buildSingleColumnTimedEventRenderModel,
 	resolveSingleColumnOverlayState,
 } from '../../../shared/event/timed-visual-model.ts';
@@ -139,4 +140,22 @@ void test('buildSingleColumnTimedEventRenderModel disables dragging when event h
 	});
 
 	assert.strictEqual(model.draggable, false);
+});
+
+void test('buildSingleColumnTimedDragAnchor uses the rendered slice start for continuation segments', () => {
+	const placement = createPlacement(
+		{
+			date: '2026-03-08',
+			endDate: '2026-03-09',
+			startTime: '23:30',
+			endTime: '02:10',
+		},
+		{ start: '2026-03-09', end: '2026-03-09', span: 1 },
+		{ startMinutes: 0, endMinutes: 130 },
+	);
+
+	assert.deepEqual(buildSingleColumnTimedDragAnchor('2026-03-09', placement), {
+		dateKey: '2026-03-09',
+		startMinutes: 0,
+	});
 });

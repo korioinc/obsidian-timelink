@@ -24,6 +24,27 @@ void test('deriveTimedDragStartState returns segment start and start-time minute
 	assert.strictEqual(state.color, '#2244ff');
 });
 
+void test('deriveTimedDragStartState resolves actual start from a continuation slice anchor', () => {
+	const segment = createSegment(
+		{
+			date: '2026-03-08',
+			endDate: '2026-03-09',
+			startTime: '23:30',
+			endTime: '02:10',
+			color: '#2244ff',
+		},
+		{ start: '2026-03-09', end: '2026-03-09', span: 1 },
+	);
+	const state = deriveTimedDragStartState(segment, {
+		dateKey: '2026-03-09',
+		startMinutes: 0,
+	});
+
+	assert.strictEqual(state.hoverDateKey, '2026-03-08');
+	assert.strictEqual(state.hoverMinutes, 23 * 60 + 30);
+	assert.strictEqual(state.color, '#2244ff');
+});
+
 void test('resolveTimedColor prefers preview color then segment color then default', () => {
 	const segment = createSegment({ color: '#333333' });
 

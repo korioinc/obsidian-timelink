@@ -1,4 +1,9 @@
-import type { EventSegment, TimeSelectionRange, TimedEventPlacement } from '../event/types';
+import type {
+	EventSegment,
+	TimeSelectionRange,
+	TimedDragAnchor,
+	TimedEventPlacement,
+} from '../event/types';
 
 export type SingleColumnTimedViewProps = {
 	date: Date;
@@ -20,7 +25,11 @@ export type SingleColumnTimedViewProps = {
 	onTimedResizeStart: (segment: EventSegment, event: PointerEvent) => void;
 	timedResizingId?: string | null;
 	timedDraggingId?: string | null;
-	onTimedEventDragStart: (event: DragEvent, segment: EventSegment) => void;
+	onTimedEventDragStart: (
+		event: DragEvent,
+		segment: EventSegment,
+		dragAnchor?: TimedDragAnchor,
+	) => void;
 	onTimedEventDragEnd: () => void;
 	onTimedEventDragOver: (event: DragEvent) => void;
 	onTimedEventDrop: (event: DragEvent) => void;
@@ -49,7 +58,11 @@ type SingleColumnTimedGridEventHandlers = {
 	onEventClick: (segment: EventSegment) => void;
 	onToggleCompleted: (segment: EventSegment) => void;
 	onTimedResizeStart: (segment: EventSegment, event: PointerEvent) => void;
-	onTimedEventDragStart: (event: DragEvent, segment: EventSegment) => void;
+	onTimedEventDragStart: (
+		event: DragEvent,
+		segment: EventSegment,
+		dragAnchor?: TimedDragAnchor,
+	) => void;
 	onTimedEventDragEnd: () => void;
 };
 

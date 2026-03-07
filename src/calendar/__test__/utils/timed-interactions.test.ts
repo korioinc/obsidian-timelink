@@ -4,6 +4,7 @@ import {
 	buildTimedResizeEvent,
 	deriveTimedDragRange,
 	deriveTimedResizeRange,
+	resolveTimedDragHoverState,
 } from '../../../shared/event/time-grid-interactions.ts';
 import { assert, test } from 'vitest';
 
@@ -82,4 +83,36 @@ void test('buildTimedDragDropEvent rolls 24:00 start over to next-day 00:00', ()
 	assert.strictEqual(updated.startTime, '00:00');
 	assert.strictEqual(updated.endDate, '2026-03-03');
 	assert.strictEqual(updated.endTime, '01:00');
+});
+
+void test('resolveTimedDragHoverState preserves actual start when dragging a continuation slice', () => {
+	const segment = createSegment(
+		{
+			date: '2026-03-08',
+			endDate: '2026-03-09',
+			startTime: '23:30',
+			endTime: '02:10',
+		},
+		{ start: '2026-03-09', end: '2026-03-09', span: 1 },
+	);
+
+	const startHover = resolveTimedDragHoverState(segment, '2026-03-09', 0, {
+		dateKey: '2026-03-09',
+		startMinutes: 0,
+	});
+	assert.deepEqual(startHover, {
+		dateKey: '2026-03-08',
+		minutes: 23 * 60 + 30,
+	});
+
+	const movedHover = resolveTimedDragHoverState(segment, '2026-03-10', 0, {
+		dateKey: '2026-03-09',
+		startMinutes: 0,
+	});
+	const updated = buildTimedDragDropEvent(segment, movedHover.dateKey, movedHover.minutes);
+
+	assert.strictEqual(updated.date, '2026-03-09');
+	assert.strictEqual(updated.startTime, '23:30');
+	assert.strictEqual(updated.endDate, '2026-03-10');
+	assert.strictEqual(updated.endTime, '02:10');
 });

@@ -1,4 +1,5 @@
 import {
+	buildSingleColumnTimedDragAnchor,
 	buildSingleColumnTimedEventRenderEntries,
 	resolveSingleColumnOverlayState,
 } from '../event/timed-visual-model';
@@ -99,6 +100,7 @@ export const SingleColumnTimedGrid = ({
 			onTimedResizeStart,
 			onTimedEventDragStart,
 			onTimedEventDragEnd,
+			dragAnchor: buildSingleColumnTimedDragAnchor(dateKey, entry.placement),
 			variant,
 		}),
 	);

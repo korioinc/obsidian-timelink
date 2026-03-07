@@ -69,6 +69,11 @@ export type TimedEventPlacement = {
 	columnCount: number;
 };
 
+export type TimedDragAnchor = {
+	dateKey: string;
+	startMinutes: number;
+};
+
 export type TimeSelectionState = {
 	isSelecting: boolean;
 	anchorDateKey: string | null;

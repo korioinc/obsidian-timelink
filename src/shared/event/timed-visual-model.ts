@@ -1,7 +1,12 @@
 import { normalizeDateRangeKeys } from '../time-grid/overlay-range';
 import { buildSingleColumnSegments } from '../time-grid/overlay-segments';
 import { MINUTES_IN_DAY, toMinutes } from './model-utils';
-import type { EventSegment, TimeSelectionRange, TimedEventPlacement } from './types';
+import type {
+	EventSegment,
+	TimeSelectionRange,
+	TimedDragAnchor,
+	TimedEventPlacement,
+} from './types';
 
 const clampMinutes = (value: number) => Math.min(MINUTES_IN_DAY, Math.max(0, value));
 
@@ -167,6 +172,14 @@ export type SingleColumnTimedEventRenderEntry = {
 	placement: TimedEventPlacement;
 	model: SingleColumnTimedEventRenderModel;
 };
+
+export const buildSingleColumnTimedDragAnchor = (
+	dateKey: string,
+	placement: TimedEventPlacement,
+): TimedDragAnchor => ({
+	dateKey,
+	startMinutes: placement.startMinutes,
+});
 
 type SingleColumnTimedRenderSharedParams = {
 	dateKey: string;

@@ -1,5 +1,5 @@
 import type { SingleColumnTimedEventRenderEntry } from '../event/timed-visual-model';
-import type { EventSegment, TimedEventPlacement } from '../event/types';
+import type { EventSegment, TimedDragAnchor, TimedEventPlacement } from '../event/types';
 
 export type TimedEventCardVariant = 'calendar' | 'timeline';
 
@@ -17,8 +17,13 @@ type TimedEventCardProps = {
 	onEventClick: (segment: EventSegment) => void;
 	onToggleCompleted: (segment: EventSegment) => void;
 	onTimedResizeStart: (segment: EventSegment, event: PointerEvent) => void;
-	onTimedEventDragStart: (event: DragEvent, segment: EventSegment) => void;
+	onTimedEventDragStart: (
+		event: DragEvent,
+		segment: EventSegment,
+		dragAnchor?: TimedDragAnchor,
+	) => void;
 	onTimedEventDragEnd: () => void;
+	dragAnchor?: TimedDragAnchor;
 	variant?: TimedEventCardVariant;
 };
 
@@ -41,6 +46,7 @@ export const TimedEventCard = ({
 	onTimedResizeStart,
 	onTimedEventDragStart,
 	onTimedEventDragEnd,
+	dragAnchor,
 	variant = 'calendar',
 }: TimedEventCardProps) => {
 	const isTimeline = variant === 'timeline';
@@ -65,7 +71,7 @@ export const TimedEventCard = ({
 			}}
 			onDragStart={(event) => {
 				event.stopPropagation();
-				onTimedEventDragStart(event, placement.segment);
+				onTimedEventDragStart(event, placement.segment, dragAnchor);
 			}}
 			onDragEnd={(event) => {
 				event.stopPropagation();
@@ -131,8 +137,13 @@ type RenderTimedEventCardNodeParams = {
 	onEventClick: (segment: EventSegment) => void;
 	onToggleCompleted: (segment: EventSegment) => void;
 	onTimedResizeStart: (segment: EventSegment, event: PointerEvent) => void;
-	onTimedEventDragStart: (event: DragEvent, segment: EventSegment) => void;
+	onTimedEventDragStart: (
+		event: DragEvent,
+		segment: EventSegment,
+		dragAnchor?: TimedDragAnchor,
+	) => void;
 	onTimedEventDragEnd: () => void;
+	dragAnchor?: TimedDragAnchor;
 	variant?: TimedEventCardVariant;
 };
 
@@ -143,6 +154,7 @@ export const renderTimedEventCardNode = ({
 	onTimedResizeStart,
 	onTimedEventDragStart,
 	onTimedEventDragEnd,
+	dragAnchor,
 	variant,
 }: RenderTimedEventCardNodeParams) => {
 	const { placement, model } = entry;
@@ -164,6 +176,7 @@ export const renderTimedEventCardNode = ({
 			onTimedResizeStart={onTimedResizeStart}
 			onTimedEventDragStart={onTimedEventDragStart}
 			onTimedEventDragEnd={onTimedEventDragEnd}
+			dragAnchor={dragAnchor}
 			variant={variant}
 		/>
 	);

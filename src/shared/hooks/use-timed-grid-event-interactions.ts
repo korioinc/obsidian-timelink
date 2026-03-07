@@ -2,6 +2,7 @@ import {
 	buildTimedResizeEvent,
 	deriveTimedDragRange,
 	deriveTimedResizeRange,
+	resolveTimedDragHoverState,
 } from '../event/time-grid-interactions';
 import { buildTimedDragDropEvent } from '../event/time-grid-interactions';
 import {
@@ -9,7 +10,12 @@ import {
 	deriveTimedResizeStartState,
 	resolveTimedColor,
 } from '../event/timed-interaction-state';
-import type { EditableEventResponse, EventSegment, TimeSelectionRange } from '../event/types';
+import type {
+	EditableEventResponse,
+	EventSegment,
+	TimeSelectionRange,
+	TimedDragAnchor,
+} from '../event/types';
 import { registerWindowPointerMoveAndUp } from './window-pointer-events';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
@@ -65,7 +71,11 @@ export type UseTimedGridEventInteractionsResult = {
 	timedResizeColorValue: string;
 	timedDragColorValue: string;
 	handleTimedResizeStart: (segment: EventSegment, event: PointerEvent) => void;
-	handleTimedDragStart: (event: DragEvent, segment: EventSegment) => void;
+	handleTimedDragStart: (
+		event: DragEvent,
+		segment: EventSegment,
+		dragAnchor?: TimedDragAnchor,
+	) => void;
 	handleTimedDragEnd: () => void;
 	handleTimedEventDragOver: (event: DragEvent) => void;
 	handleTimedEventDrop: (event: DragEvent) => void;
@@ -105,6 +115,7 @@ export const useTimedGridEventInteractions = ({
 	const [timedResizeHoverMinutes, setTimedResizeHoverMinutes] = useState<number | null>(null);
 	const [timedResizeColor, setTimedResizeColor] = useState<string | null>(null);
 	const [timedDragging, setTimedDragging] = useState<EventSegment | null>(null);
+	const [timedDragAnchor, setTimedDragAnchor] = useState<TimedDragAnchor | null>(null);
 	const [timedDragHoverDateKey, setTimedDragHoverDateKey] = useState<string | null>(null);
 	const [timedDragHoverMinutes, setTimedDragHoverMinutes] = useState<number | null>(null);
 	const [timedDragColor, setTimedDragColor] = useState<string | null>(null);
@@ -113,6 +124,7 @@ export const useTimedGridEventInteractions = ({
 
 	const clearDragState = () => {
 		setTimedDragging(null);
+		setTimedDragAnchor(null);
 		setTimedDragHoverDateKey(null);
 		setTimedDragHoverMinutes(null);
 		setTimedDragColor(null);
@@ -185,15 +197,20 @@ export const useTimedGridEventInteractions = ({
 		timedResizeHoverMinutes,
 	]);
 
-	const handleTimedDragStart = (event: DragEvent, segment: EventSegment) => {
+	const handleTimedDragStart = (
+		event: DragEvent,
+		segment: EventSegment,
+		dragAnchor?: TimedDragAnchor,
+	) => {
 		event.stopPropagation();
 		if (!canDragSegment(segment)) return;
 		if (setResizeRefOnDragStart) {
 			isResizingRef.current = true;
 		}
 		onDragStart?.(event, segment);
-		const nextState = deriveTimedDragStartState(segment);
+		const nextState = deriveTimedDragStartState(segment, dragAnchor);
 		setTimedDragging(segment);
+		setTimedDragAnchor(dragAnchor ?? null);
 		setTimedDragHoverDateKey(nextState.hoverDateKey);
 		setTimedDragHoverMinutes(nextState.hoverMinutes);
 		setTimedDragColor(nextState.color);
@@ -215,8 +232,14 @@ export const useTimedGridEventInteractions = ({
 		event.preventDefault();
 		const next = resolveDragPointerState(event);
 		if (!next) return;
-		setTimedDragHoverDateKey(next.dateKey);
-		setTimedDragHoverMinutes(next.minutes);
+		const hoverState = resolveTimedDragHoverState(
+			timedDragging,
+			next.dateKey,
+			next.minutes,
+			timedDragAnchor,
+		);
+		setTimedDragHoverDateKey(hoverState.dateKey);
+		setTimedDragHoverMinutes(hoverState.minutes);
 	};
 
 	const handleTimedEventDrop = (event: DragEvent) => {
@@ -224,9 +247,19 @@ export const useTimedGridEventInteractions = ({
 		event.preventDefault();
 		const next = resolveDragPointerState(event);
 		if (!next) return;
+		const hoverState = resolveTimedDragHoverState(
+			timedDragging,
+			next.dateKey,
+			next.minutes,
+			timedDragAnchor,
+		);
 		timedDidDropRef.current = true;
 		const previous: EditableEventResponse = [timedDragging.event, timedDragging.location];
-		const updatedEvent = buildTimedDragDropEvent(timedDragging, next.dateKey, next.minutes);
+		const updatedEvent = buildTimedDragDropEvent(
+			timedDragging,
+			hoverState.dateKey,
+			hoverState.minutes,
+		);
 		void onMoveEvent([updatedEvent, timedDragging.location], previous);
 		if (clearDragStateAfterDrop) {
 			clearDragState();
