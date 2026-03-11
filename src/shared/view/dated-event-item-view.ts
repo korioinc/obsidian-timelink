@@ -4,6 +4,13 @@ import type { App, WorkspaceLeaf } from 'obsidian';
 type CalendarProvider<Resource> = {
 	getCalendar: () => Resource;
 };
+type LeafViewState = { file?: string; filePath?: string } | undefined;
+
+function getLeafFilePath(leaf: WorkspaceLeaf): string | null {
+	const state = leaf.getViewState().state as LeafViewState;
+	const currentFile = (leaf.view as { file?: { path?: string } | null } | undefined)?.file;
+	return currentFile?.path ?? state?.file ?? state?.filePath ?? null;
+}
 
 export type DatedEventItemViewPluginContext<Resource> = {
 	app: App;
@@ -27,6 +34,18 @@ export abstract class DatedEventItemView<Resource> extends MountedItemView {
 	): void;
 	protected abstract unmountDatedView(containerEl: HTMLElement): void;
 
+	private async openNote(path: string): Promise<void> {
+		const existingLeaf = this.plugin.app.workspace
+			.getLeavesOfType('markdown')
+			.find((leaf) => getLeafFilePath(leaf) === path);
+		if (existingLeaf) {
+			await Promise.resolve(this.plugin.app.workspace.revealLeaf(existingLeaf));
+			return;
+		}
+
+		await this.plugin.app.workspace.openLinkText(path, '', true);
+	}
+
 	protected mountMountedView(containerEl: HTMLElement): void {
 		const calendar = this.plugin.calendar?.getCalendar();
 		if (!calendar) {
@@ -34,7 +53,7 @@ export abstract class DatedEventItemView<Resource> extends MountedItemView {
 			return;
 		}
 		this.mountDatedView(containerEl, this.plugin.app, calendar, (path: string) => {
-			void this.plugin.app.workspace.openLinkText(path, '', true);
+			void this.openNote(path);
 		});
 	}
 
