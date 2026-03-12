@@ -1,5 +1,6 @@
+import { getLeafFilePath } from '../services/leaf-service';
 import type { App, Component } from 'obsidian';
-import { MarkdownRenderer } from 'obsidian';
+import { MarkdownRenderer, TFile } from 'obsidian';
 import { h } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 
@@ -13,6 +14,21 @@ type CardTitleRendererProps = {
 	title: string;
 	markdownContext: CardTitleMarkdownContext;
 };
+
+async function openCardTitleLink(app: App, href: string, sourcePath: string): Promise<void> {
+	const destination = app.metadataCache.getFirstLinkpathDest(href, sourcePath);
+	if (destination instanceof TFile) {
+		const existingLeaf = app.workspace
+			.getLeavesOfType('markdown')
+			.find((leaf) => getLeafFilePath(leaf) === destination.path);
+		if (existingLeaf) {
+			await Promise.resolve(app.workspace.revealLeaf(existingLeaf));
+			return;
+		}
+	}
+
+	await app.workspace.openLinkText(href, sourcePath, true);
+}
 
 export function CardTitleRenderer({
 	title,
@@ -50,7 +66,7 @@ export function CardTitleRenderer({
 			if (!href) return;
 			event.preventDefault();
 			event.stopPropagation();
-			void markdownContext.app.workspace.openLinkText(href, markdownContext.sourcePath, true);
+			void openCardTitleLink(markdownContext.app, href, markdownContext.sourcePath);
 		};
 
 		host.addEventListener('click', handleClick);
