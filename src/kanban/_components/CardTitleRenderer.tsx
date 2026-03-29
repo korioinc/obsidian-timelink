@@ -1,4 +1,5 @@
 import { getLeafFilePath } from '../services/leaf-service';
+import { createCardTitleLinkClickGuard } from '../utils/card-title-link-click-guard';
 import type { App, Component } from 'obsidian';
 import { MarkdownRenderer, TFile } from 'obsidian';
 import { h } from 'preact';
@@ -35,10 +36,12 @@ export function CardTitleRenderer({
 	markdownContext,
 }: CardTitleRendererProps): h.JSX.Element {
 	const hostRef = useRef<HTMLSpanElement>(null);
+	const linkClickGuardRef = useRef(createCardTitleLinkClickGuard());
 
 	useEffect(() => {
 		const host = hostRef.current;
 		if (!host) return;
+		const dragContainer = host.closest<HTMLElement>('li[data-card-id]');
 
 		host.innerHTML = '';
 		let cancelled = false;
@@ -57,11 +60,19 @@ export function CardTitleRenderer({
 			});
 		});
 
+		const handleDragInteraction = () => {
+			linkClickGuardRef.current.noteDragInteraction();
+		};
 		const handleClick = (event: MouseEvent) => {
 			const target = event.target as HTMLElement | null;
 			if (!target) return;
 			const anchor = target.closest('a');
 			if (!anchor) return;
+			if (linkClickGuardRef.current.shouldSuppressClick()) {
+				event.preventDefault();
+				event.stopPropagation();
+				return;
+			}
 			const href = anchor.getAttribute('data-href') ?? anchor.getAttribute('href');
 			if (!href) return;
 			event.preventDefault();
@@ -69,9 +80,13 @@ export function CardTitleRenderer({
 			void openCardTitleLink(markdownContext.app, href, markdownContext.sourcePath);
 		};
 
+		dragContainer?.addEventListener('dragstart', handleDragInteraction);
+		dragContainer?.addEventListener('dragend', handleDragInteraction);
 		host.addEventListener('click', handleClick);
 		return () => {
 			cancelled = true;
+			dragContainer?.removeEventListener('dragstart', handleDragInteraction);
+			dragContainer?.removeEventListener('dragend', handleDragInteraction);
 			host.removeEventListener('click', handleClick);
 			host.innerHTML = '';
 		};

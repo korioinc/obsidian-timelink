@@ -107,6 +107,7 @@ export function useLaneCardDnd({
 		card: LaneCard,
 		index: number,
 	) => {
+		event.stopPropagation();
 		if (isInteractionLocked) {
 			event.preventDefault();
 			return;
@@ -136,6 +137,7 @@ export function useLaneCardDnd({
 	};
 
 	const handleCardDragEnd = (event: TargetedDragEvent<HTMLLIElement>, cardId: string) => {
+		event.stopPropagation();
 		onCardDragEnd();
 		event.currentTarget.classList.remove('opacity-40');
 		const activeDrag = getActiveCardDrag();
