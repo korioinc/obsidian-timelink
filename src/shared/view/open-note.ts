@@ -1,6 +1,7 @@
 import type { App, TFile, WorkspaceLeaf } from 'obsidian';
 
 type LeafViewState = { file?: string; filePath?: string } | undefined;
+type OpenableFile = TFile & { path: string };
 
 function getLeafFilePath(leaf: WorkspaceLeaf): string | null {
 	const state = leaf.getViewState().state as LeafViewState;
@@ -8,8 +9,9 @@ function getLeafFilePath(leaf: WorkspaceLeaf): string | null {
 	return currentFile?.path ?? state?.file ?? state?.filePath ?? null;
 }
 
-function isFileLike(value: unknown): value is TFile {
-	return typeof value === 'object' && value !== null && typeof (value as TFile).path === 'string';
+function isFileLike(value: unknown): value is OpenableFile {
+	if (!value || typeof value !== 'object') return false;
+	return typeof (value as { path?: unknown }).path === 'string';
 }
 
 export async function openNoteInWorkspace(

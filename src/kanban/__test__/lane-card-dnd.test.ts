@@ -1,12 +1,11 @@
+import { useLaneCardDnd } from '../hooks/use-lane-card-dnd.ts';
 import { clearActiveCardDrag, getActiveCardDrag, setActiveCardDrag } from '../utils/card-dnd.ts';
 import type { TargetedDragEvent } from 'preact';
 import { afterEach, assert, test, vi } from 'vitest';
 
 vi.mock('preact/hooks', () => ({
-	useRef: <T,>(initial: T) => ({ current: initial }),
+	useRef: <T>(initial: T) => ({ current: initial }),
 }));
-
-import { useLaneCardDnd } from '../hooks/use-lane-card-dnd.ts';
 
 type MockDataTransfer = {
 	effectAllowed: string;
@@ -35,8 +34,8 @@ function createHandlers() {
 		listRef: { current: null },
 		wrapperRef: { current: null },
 		isInteractionLocked: false,
-		onMoveCard: vi.fn(async () => undefined),
-		onMoveCardFromOtherBoard: vi.fn(async () => undefined),
+		onMoveCard: vi.fn(() => Promise.resolve()),
+		onMoveCardFromOtherBoard: vi.fn(() => Promise.resolve()),
 		onCardDragStart: vi.fn(),
 		onCardDragEnd: vi.fn(),
 	});
