@@ -7,7 +7,7 @@ import {
 	saveEventEntry,
 	type EventServiceDeps,
 } from '../event/event-service';
-import type { CalendarEvent, EditableEventResponse } from '../event/types';
+import type { CalendarEvent, DeleteEventOptions, EditableEventResponse } from '../event/types';
 import { createNotice } from '../services/notice-service';
 import { useVaultPathDataLoader } from './use-vault-path-data-loader';
 import type { App } from 'obsidian';
@@ -28,7 +28,7 @@ type UseEventEntriesControllerResult = {
 	loadError: string | null;
 	notice: (message: string) => void;
 	handleSaveEvent: (next: EditableEventResponse, previous: EditableEventResponse) => Promise<void>;
-	handleDeleteEvent: (entry: EditableEventResponse) => Promise<void>;
+	handleDeleteEvent: (entry: EditableEventResponse, options?: DeleteEventOptions) => Promise<void>;
 	handleMoveEvent: (next: EditableEventResponse, previous: EditableEventResponse) => Promise<void>;
 	handleCreateEvent: (event: CalendarEvent) => Promise<void>;
 };
@@ -72,8 +72,8 @@ export const useEventEntriesController = ({
 	);
 
 	const handleDeleteEvent = useCallback(
-		async (entry: EditableEventResponse) => {
-			await deleteEventEntry(eventServiceDeps, entry);
+		async (entry: EditableEventResponse, options?: DeleteEventOptions) => {
+			await deleteEventEntry(eventServiceDeps, entry, options);
 		},
 		[eventServiceDeps],
 	);

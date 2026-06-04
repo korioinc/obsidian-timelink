@@ -189,3 +189,23 @@ void test('deleteEventEntry removes matching entry by location value', async () 
 	assert.deepEqual(notices, []);
 	assert.strictEqual(harness.getState().length, 0);
 });
+
+void test('deleteEventEntry passes linked note deletion option to calendar', async () => {
+	const entry = createEntry({ title: 'To remove with note' }, 'calendar/remove.md');
+	const harness = createSetEventsHarness([entry]);
+	let deleteLinkedNote: boolean | undefined;
+	const calendar: CalendarMock = {
+		modifyEvent: () => Promise.resolve(),
+		deleteEvent: (_location, options) => {
+			deleteLinkedNote = options?.deleteLinkedNote;
+			return Promise.resolve();
+		},
+		createEvent: () => Promise.resolve(createLocation('calendar/new.md')),
+	};
+	const { deps } = createDeps(calendar, harness.setEvents);
+
+	await deleteEventEntry(deps, entry, { deleteLinkedNote: true });
+
+	assert.strictEqual(deleteLinkedNote, true);
+	assert.strictEqual(harness.getState().length, 0);
+});

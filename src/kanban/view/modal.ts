@@ -142,7 +142,7 @@ function addVisibilityToggleSetting(
 			toggle.onChange((value) => {
 				void view.updateBoardSettings({
 					[config.key]: value ? undefined : false,
-				} as KanbanBoardSettings);
+				});
 			});
 		});
 }

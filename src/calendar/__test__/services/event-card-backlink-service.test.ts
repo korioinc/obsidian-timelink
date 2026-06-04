@@ -5,6 +5,7 @@ import {
 import {
 	clearLinkedCardEventBacklink,
 	syncLinkedCardEventBacklink,
+	trashLinkedCardNoteIfBodyEmpty,
 } from '../../services/event-card-backlink-service';
 import type { App } from 'obsidian';
 import { assert, test } from 'vitest';
@@ -12,6 +13,8 @@ import { assert, test } from 'vitest';
 const createMockApp = (
 	cardFile: { path: string } | null,
 	frontmatterByPath: Record<string, Record<string, unknown>>,
+	trashCalls: string[] = [],
+	markdownByPath: Record<string, string> = {},
 ): App =>
 	({
 		metadataCache: {
@@ -32,6 +35,13 @@ const createMockApp = (
 				return Promise.resolve();
 			},
 			generateMarkdownLink: (file: { path: string }) => `[[${file.path}|Event title]]`,
+			trashFile: (file: { path: string }) => {
+				trashCalls.push(file.path);
+				return Promise.resolve();
+			},
+		},
+		vault: {
+			cachedRead: (file: { path: string }) => Promise.resolve(markdownByPath[file.path] ?? ''),
 		},
 	}) as unknown as App;
 
@@ -93,4 +103,63 @@ void test('event-card backlink helpers no-op when linked card does not exist', a
 	});
 
 	assert.deepEqual(frontmatterByPath, {});
+});
+
+void test('trashLinkedCardNoteIfBodyEmpty trashes linked card file with frontmatter only', async () => {
+	const cardFile = { path: 'Cards/Backlog card.md' };
+	const frontmatterByPath: Record<string, Record<string, unknown>> = {};
+	const trashCalls: string[] = [];
+	const app = createMockApp(cardFile, frontmatterByPath, trashCalls, {
+		[cardFile.path]: [
+			'---',
+			`${TIMELINK_EVENT_KEY}: "[[Events/2026-03-05 test.md]]"`,
+			'---',
+			'',
+		].join('\n'),
+	});
+
+	const deleted = await trashLinkedCardNoteIfBodyEmpty(app, 'Events/2026-03-05 test.md', {
+		[TIMELINK_CARD_KEY]: '[[Cards/Backlog card]]',
+	});
+
+	assert.strictEqual(deleted, true);
+	assert.deepEqual(trashCalls, [cardFile.path]);
+});
+
+void test('trashLinkedCardNoteIfBodyEmpty keeps linked card file with body and removes event link', async () => {
+	const cardFile = { path: 'Cards/Backlog card.md' };
+	const frontmatterByPath: Record<string, Record<string, unknown>> = {
+		[cardFile.path]: {
+			[TIMELINK_EVENT_KEY]: '[[Events/2026-03-05 test.md|Event title]]',
+		},
+	};
+	const trashCalls: string[] = [];
+	const app = createMockApp(cardFile, frontmatterByPath, trashCalls, {
+		[cardFile.path]: [
+			'---',
+			`${TIMELINK_EVENT_KEY}: "[[Events/2026-03-05 test.md]]"`,
+			'---',
+			'',
+			'# Saved notes',
+		].join('\n'),
+	});
+
+	const deleted = await trashLinkedCardNoteIfBodyEmpty(app, 'Events/2026-03-05 test.md', {
+		[TIMELINK_CARD_KEY]: '[[Cards/Backlog card]]',
+	});
+
+	assert.strictEqual(deleted, false);
+	assert.deepEqual(trashCalls, []);
+	assert.strictEqual(frontmatterByPath[cardFile.path]?.[TIMELINK_EVENT_KEY], undefined);
+});
+
+void test('trashLinkedCardNoteIfBodyEmpty no-ops when event has no linked card file', async () => {
+	const frontmatterByPath: Record<string, Record<string, unknown>> = {};
+	const trashCalls: string[] = [];
+	const app = createMockApp(null, frontmatterByPath, trashCalls);
+
+	const deleted = await trashLinkedCardNoteIfBodyEmpty(app, 'Events/2026-03-05 test.md', {});
+
+	assert.strictEqual(deleted, false);
+	assert.deepEqual(trashCalls, []);
 });

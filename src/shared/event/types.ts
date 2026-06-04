@@ -3,6 +3,15 @@ export type EventLocation = {
 	lineNumber: number | undefined;
 };
 
+export type DeleteEventOptions = {
+	deleteLinkedNote?: boolean;
+};
+
+export type DeleteEventConfirmationResult = {
+	approved: boolean;
+	deleteLinkedNote: boolean;
+};
+
 export type CalendarEvent = {
 	title: string;
 	id?: string;

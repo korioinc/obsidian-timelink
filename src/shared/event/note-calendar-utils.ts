@@ -30,5 +30,5 @@ export const toEventFromFrontmatter = (
 		...frontmatter,
 		title,
 		allDay,
-	} as CalendarEvent;
+	};
 };

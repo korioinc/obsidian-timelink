@@ -118,6 +118,41 @@ void test('handleDropFactory updates movable event and clears drag state', () =>
 	assert.strictEqual(nextEndDate, '2026-03-05');
 });
 
+void test('handleDropFactory preserves next-day midnight timed boundary while moving event', () => {
+	const segment = createSegment(
+		{
+			allDay: false,
+			date: '2026-06-05',
+			startTime: '21:00',
+			endDate: '2026-06-06',
+			endTime: '00:00',
+		},
+		{ start: '2026-06-05', end: '2026-06-05', span: 1 },
+	);
+	const didDropRef = { current: false };
+	let nextDate: string | undefined;
+	let nextEndDate: string | null | undefined;
+	let nextEndTime: string | null | undefined;
+
+	const handleDrop = handleDropFactory(
+		() => segment,
+		() => undefined,
+		() => undefined,
+		(next) => {
+			nextDate = next[0].date;
+			nextEndDate = next[0].endDate;
+			nextEndTime = next[0].endTime;
+		},
+		didDropRef,
+	);
+
+	handleDrop('2026-06-08');
+
+	assert.strictEqual(nextDate, '2026-06-08');
+	assert.strictEqual(nextEndDate, '2026-06-09');
+	assert.strictEqual(nextEndTime, '00:00');
+});
+
 void test('handleDropFactory does not move event without date', () => {
 	const segment = createSegment(
 		{ date: undefined, startDate: '2026-03-01', endDate: undefined },

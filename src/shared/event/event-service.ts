@@ -5,11 +5,16 @@ import {
 	updateEventEntry,
 	updateEventLocation,
 } from './event-sync';
-import type { CalendarEvent, EditableEventResponse, EventLocation } from './types';
+import type {
+	CalendarEvent,
+	DeleteEventOptions,
+	EditableEventResponse,
+	EventLocation,
+} from './types';
 
 export type EventServiceCalendar = {
 	createEvent: (event: CalendarEvent, body?: string) => Promise<EventLocation>;
-	deleteEvent: (location: EventLocation) => Promise<void>;
+	deleteEvent: (location: EventLocation, options?: DeleteEventOptions) => Promise<void>;
 	getEvents: () => Promise<EditableEventResponse[]>;
 	modifyEvent: (
 		location: EventLocation,
@@ -119,10 +124,11 @@ export const moveEventEntry = async (
 export const deleteEventEntry = async (
 	deps: EventServiceDeps,
 	entry: EditableEventResponse,
+	options?: DeleteEventOptions,
 ): Promise<void> => {
 	deps.scheduleReload();
 	try {
-		await deps.calendar.deleteEvent(entry[1]);
+		await deps.calendar.deleteEvent(entry[1], options);
 		deps.setEvents((current) =>
 			current.filter(([, location]) => !isSameEventLocation(location, entry[1])),
 		);

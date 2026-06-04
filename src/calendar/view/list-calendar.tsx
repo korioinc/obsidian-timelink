@@ -48,7 +48,7 @@ export const ListCalendar = ({
 
 	return (
 		<div className="flex h-full w-full flex-col overflow-x-hidden">
-			<div className="relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto outline outline-1 outline-offset-[-1px] outline-[color:var(--background-modifier-border)] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar-thumb]:bg-transparent [&::-webkit-scrollbar-track]:bg-transparent">
+			<div className="relative min-h-0 flex-1 [scrollbar-width:none] overflow-x-hidden overflow-y-auto outline outline-1 outline-offset-[-1px] outline-[color:var(--background-modifier-border)] [-ms-overflow-style:none] [&::-webkit-scrollbar]:h-0 [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar-thumb]:bg-transparent [&::-webkit-scrollbar-track]:bg-transparent">
 				{sections.map((section) => (
 					<div key={section.key} className="border-b border-[var(--background-modifier-border)]">
 						<div className="flex items-center justify-between bg-[var(--background-secondary)] px-4 py-2 text-[12px] font-semibold text-[color:var(--text-muted)]">

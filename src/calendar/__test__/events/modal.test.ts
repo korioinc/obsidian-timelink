@@ -3,6 +3,7 @@ import {
 	createEventModalState as createModalState,
 } from '../../../shared/__test__/helpers/event-factories.ts';
 import {
+	buildModalActionHandlers,
 	createGridEventClickHandler,
 	handleCreateSaveFactory,
 	handleDateClickFactory,
@@ -245,6 +246,53 @@ void test('handleCreateSaveFactory validates and creates normalized timed event'
 	assert.strictEqual(createdStartTime, '09:30');
 	assert.strictEqual(createdEndTime, '11:00');
 	assert.strictEqual(createdColor, '#AABBCC');
+	assert.strictEqual(closed, true);
+});
+
+void test('buildModalActionHandlers passes linked note deletion choice after approval', async () => {
+	const segment = createSegment({ title: 'Delete me' });
+	const modal = createModalState(segment);
+	let deleteCount = 0;
+	let closed = false;
+
+	const deniedHandlers = buildModalActionHandlers({
+		modal,
+		setModal: (next) => {
+			closed = next === null;
+		},
+		onDeleteEvent: () => {
+			deleteCount += 1;
+		},
+		confirmDeleteEvent: () => ({ approved: false, deleteLinkedNote: true }),
+		onOpenNote: () => undefined,
+		notice: () => undefined,
+	});
+
+	deniedHandlers.handleModalDelete();
+	await Promise.resolve();
+
+	assert.strictEqual(deleteCount, 0);
+	assert.strictEqual(closed, false);
+
+	const approvedHandlers = buildModalActionHandlers({
+		modal,
+		setModal: (next) => {
+			closed = next === null;
+		},
+		onDeleteEvent: (event, options) => {
+			deleteCount += 1;
+			assert.strictEqual(event[0].title, 'Delete me');
+			assert.deepEqual(options, { deleteLinkedNote: true });
+		},
+		confirmDeleteEvent: () => ({ approved: true, deleteLinkedNote: true }),
+		onOpenNote: () => undefined,
+		notice: () => undefined,
+	});
+
+	approvedHandlers.handleModalDelete();
+	await Promise.resolve();
+
+	assert.strictEqual(deleteCount, 1);
 	assert.strictEqual(closed, true);
 });
 

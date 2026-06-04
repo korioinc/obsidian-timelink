@@ -8,6 +8,10 @@ import { KANBAN_LIST_VIEW_ICON, KANBAN_LIST_VIEW_TYPE } from './kanban-list/cons
 import { TimeLinkKanbanListView } from './kanban-list/view/index';
 import { KANBAN_ICON, KANBAN_VIEW_TYPE } from './kanban/constants';
 import { KanbanManager } from './kanban/services/manager-service';
+import {
+	cleanupMissingTimelinkEventProperties,
+	hasStartupCleanupChanges,
+} from './kanban/services/startup-cleanup-service';
 import { openCreateKanbanModal } from './kanban/view/modal';
 import { DEFAULT_SETTINGS, TimeLinkSettingTab, TimeLinkSettings } from './settings';
 import { formatDateKey } from './shared/event/model-utils';
@@ -29,6 +33,7 @@ export default class TimeLinkPlugin extends Plugin {
 	private kanbanRibbonIcon: HTMLElement | null = null;
 	private kanbanListRibbonIcon: HTMLElement | null = null;
 	private ganttRibbonIcon: HTMLElement | null = null;
+	private startupCleanupStarted = false;
 	getTodayDateKey(): string {
 		return formatDateKey(new Date());
 	}
@@ -183,7 +188,26 @@ export default class TimeLinkPlugin extends Plugin {
 
 		this.addSettingTab(new TimeLinkSettingTab(this.app, this));
 
-		this.app.workspace.onLayoutReady(() => void this.initTimelineLeafSilently());
+		this.app.workspace.onLayoutReady(() => {
+			void this.runStartupCleanupOnce();
+			void this.initTimelineLeafSilently();
+		});
+	}
+
+	private async runStartupCleanupOnce(): Promise<void> {
+		if (this.startupCleanupStarted || !this.settings.enableKanban) return;
+		this.startupCleanupStarted = true;
+		try {
+			const result = await cleanupMissingTimelinkEventProperties(
+				this.app,
+				this.settings.calendarFolderPath,
+			);
+			if (!hasStartupCleanupChanges(result)) return;
+			new Notice(`Cleaned ${result.brokenEventLinks} broken event link(s).`);
+		} catch (error) {
+			console.error('Failed to clean broken TimeLink event links', error);
+			new Notice('Failed to clean broken event links.');
+		}
 	}
 
 	private async openCalendarView(): Promise<void> {

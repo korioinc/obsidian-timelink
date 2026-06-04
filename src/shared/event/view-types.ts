@@ -1,4 +1,4 @@
-import type { CalendarEvent, EditableEventResponse } from './types';
+import type { CalendarEvent, DeleteEventOptions, EditableEventResponse } from './types';
 import type { App } from 'obsidian';
 
 export type EventDayViewProps = {
@@ -9,7 +9,10 @@ export type EventDayViewProps = {
 		next: EditableEventResponse,
 		previous: EditableEventResponse,
 	) => Promise<void> | void;
-	onDeleteEvent: (event: EditableEventResponse) => Promise<void> | void;
+	onDeleteEvent: (
+		event: EditableEventResponse,
+		options?: DeleteEventOptions,
+	) => Promise<void> | void;
 	onMoveEvent: (
 		next: EditableEventResponse,
 		previous: EditableEventResponse,

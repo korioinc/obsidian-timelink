@@ -3,6 +3,8 @@ import { addDays, compareDateKey, formatDateKey, parseDateKey, toMinutes } from 
 import type {
 	CalendarEvent,
 	CreateEventState,
+	DeleteEventConfirmationResult,
+	DeleteEventOptions,
 	EditableEventResponse,
 	EventModalState,
 	EventSegment,
@@ -25,7 +27,13 @@ export type EventChangeHandler = (
 ) => Promise<void> | void;
 
 export type CreateEventHandler = (event: CalendarEvent) => Promise<void> | void;
-export type DeleteEventHandler = (event: EditableEventResponse) => Promise<void> | void;
+export type DeleteEventHandler = (
+	event: EditableEventResponse,
+	options?: DeleteEventOptions,
+) => Promise<void> | void;
+export type DeleteEventConfirmation = (
+	event: EditableEventResponse,
+) => Promise<DeleteEventConfirmationResult> | DeleteEventConfirmationResult;
 const MINUTES_IN_DAY = 24 * 60;
 
 const normalizeEventEndDate = (startDate: string, endDate?: string | null): string | undefined => {
@@ -101,6 +109,7 @@ type BuildModalActionHandlersParams = {
 	modal: EventModalState | null;
 	setModal: (next: EventModalState | null) => void;
 	onDeleteEvent: DeleteEventHandler;
+	confirmDeleteEvent?: DeleteEventConfirmation;
 	onOpenNote: (path: string) => void;
 	notice: (message: string) => void;
 };
@@ -109,13 +118,21 @@ export const buildModalActionHandlers = ({
 	modal,
 	setModal,
 	onDeleteEvent,
+	confirmDeleteEvent,
 	onOpenNote,
 	notice,
 }: BuildModalActionHandlersParams) => {
 	const handleModalDelete = () => {
 		if (!modal) return;
-		void onDeleteEvent([modal.segment.event, modal.segment.location]);
-		setModal(null);
+		const eventToDelete: EditableEventResponse = [modal.segment.event, modal.segment.location];
+		void (async () => {
+			const result = confirmDeleteEvent
+				? await confirmDeleteEvent(eventToDelete)
+				: { approved: true, deleteLinkedNote: false };
+			if (!result.approved) return;
+			void onDeleteEvent(eventToDelete, { deleteLinkedNote: result.deleteLinkedNote });
+			setModal(null);
+		})();
 	};
 
 	const handleOpenNote = () => {

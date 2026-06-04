@@ -15,13 +15,13 @@ export function around<T extends object>(obj: T, spec: AroundSpec<T>): () => voi
 		originals.set(key, next);
 		const wrapped = spec[key]?.(next);
 		if (wrapped) {
-			target[key] = wrapped as unknown;
+			target[key] = wrapped;
 		}
 	}
 
 	return () => {
 		for (const [key, fn] of originals) {
-			target[key] = fn as unknown;
+			target[key] = fn;
 		}
 	};
 }

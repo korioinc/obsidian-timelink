@@ -5,7 +5,7 @@ export const registerWindowPointerMoveAndUp = (
 	handlePointerMove: PointerMoveHandler,
 	handlePointerUp: PointerUpHandler,
 ): (() => void) => {
-	const pointerUpHandler = handlePointerUp as EventListener;
+	const pointerUpHandler = handlePointerUp;
 	window.addEventListener('pointermove', handlePointerMove);
 	window.addEventListener('pointerup', pointerUpHandler, { once: true });
 	return () => {

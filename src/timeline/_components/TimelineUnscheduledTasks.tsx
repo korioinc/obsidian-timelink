@@ -21,7 +21,7 @@ export const TimelineUnscheduledTasks = ({
 	return (
 		<div className="bg-[var(--background-primary)]">
 			<div
-				className="flex cursor-pointer items-center justify-between px-3 py-2 text-[12px] text-[color:var(--text-muted)]"
+				className="flex cursor-pointer items-center justify-between px-0 py-2 text-[12px] text-[color:var(--text-muted)]"
 				role="button"
 				tabIndex={0}
 				onClick={onToggle}
@@ -40,7 +40,7 @@ export const TimelineUnscheduledTasks = ({
 				</div>
 			</div>
 			{isOpen ? (
-				<div className="flex flex-col gap-1 px-3 pb-2">
+				<div className="flex flex-col gap-1 px-0 pb-2">
 					{count === 0 ? (
 						<div className="text-[11px] text-[color:var(--text-muted)]">No unscheduled tasks.</div>
 					) : (

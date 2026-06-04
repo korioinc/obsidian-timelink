@@ -6,6 +6,7 @@ import {
 	handleModalSaveFactory,
 	handleToggleCompletedFactory,
 	type CreateEventHandler,
+	type DeleteEventConfirmation,
 	type DeleteEventHandler,
 	type EventChangeHandler,
 } from './modal-interaction';
@@ -29,6 +30,7 @@ export type BuildEventInteractionHandlersParams = {
 	onSaveEvent: EventChangeHandler;
 	onCreateEvent: CreateEventHandler;
 	onDeleteEvent: DeleteEventHandler;
+	confirmDeleteEvent?: DeleteEventConfirmation;
 	onOpenNote: (path: string) => void;
 	notice: (message: string) => void;
 	dateClick?: DateClickDependencies;
@@ -45,6 +47,7 @@ export const createEventInteractionHandlers = ({
 	onSaveEvent,
 	onCreateEvent,
 	onDeleteEvent,
+	confirmDeleteEvent,
 	onOpenNote,
 	notice,
 	dateClick,
@@ -68,6 +71,7 @@ export const createEventInteractionHandlers = ({
 		modal,
 		setModal,
 		onDeleteEvent,
+		confirmDeleteEvent,
 		onOpenNote,
 		notice,
 	});

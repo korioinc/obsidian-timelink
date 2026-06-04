@@ -1,11 +1,16 @@
-import { getShiftedDateRange } from '../../../shared/event/date-range';
+import {
+	getShiftedDateRange,
+	resolveNormalizedEventDateRange,
+} from '../../../shared/event/date-range';
 import { compareDateKey } from '../../../shared/event/model-utils';
 import type { EventSegment } from '../../types';
 
 const deriveDragRange = (dragging: EventSegment | null, dragHoverDateKey: string | null) => {
 	if (!dragging || !dragHoverDateKey) return null;
-	const baseStart = dragging.event.date ?? dragging.start;
-	const baseEnd = dragging.event.endDate ?? dragging.event.date ?? dragging.end;
+	const normalizedRange = resolveNormalizedEventDateRange(dragging.event);
+	const baseStart = normalizedRange?.startKey ?? dragging.event.date ?? dragging.start;
+	const baseEnd =
+		normalizedRange?.endKey ?? dragging.event.endDate ?? dragging.event.date ?? dragging.end;
 	return getShiftedDateRange(baseStart, baseEnd, dragHoverDateKey);
 };
 

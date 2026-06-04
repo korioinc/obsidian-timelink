@@ -76,7 +76,7 @@ function extractSettingsFooter(markdown: string): Partial<KanbanBoardSettings> {
 	try {
 		const parsed: unknown = JSON.parse(jsonText);
 		if (!isRecord(parsed)) return {};
-		return parsed as Partial<KanbanBoardSettings>;
+		return parsed;
 	} catch {
 		return {};
 	}

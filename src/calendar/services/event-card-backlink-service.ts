@@ -35,6 +35,26 @@ type SyncLinkedCardEventBacklinkParams = {
 	frontmatter: Frontmatter;
 };
 
+type LinkedCardTrashApp = FrontmatterMetadataApp & {
+	metadataCache: FrontmatterMetadataApp['metadataCache'] & {
+		getFirstLinkpathDest(path: string, sourcePath: string): FrontmatterFileLike | null;
+	};
+	fileManager: FrontmatterMutationApp['fileManager'] & {
+		trashFile(file: FrontmatterFileLike): Promise<void>;
+	};
+	vault: {
+		cachedRead(file: FrontmatterFileLike): Promise<string>;
+	};
+};
+
+const FRONTMATTER_BLOCK_PATTERN = /^---\n[\s\S]*?\n---/;
+
+const getMarkdownBody = (markdown: string): string => {
+	const normalized = markdown.replace(/\r\n/g, '\n');
+	const frontmatterBlock = normalized.match(FRONTMATTER_BLOCK_PATTERN);
+	return (frontmatterBlock ? normalized.slice(frontmatterBlock[0].length) : normalized).trim();
+};
+
 export const clearLinkedCardEventBacklink = async (
 	app: BacklinkApp,
 	sourcePath: string,
@@ -56,4 +76,20 @@ export const syncLinkedCardEventBacklink = async ({
 	if (!cardFile) return;
 	const eventLink = app.fileManager.generateMarkdownLink(eventFile, cardFile.path, '', eventTitle);
 	await setFrontmatterValue(app, cardFile, TIMELINK_EVENT_KEY, eventLink);
+};
+
+export const trashLinkedCardNoteIfBodyEmpty = async (
+	app: LinkedCardTrashApp,
+	sourcePath: string,
+	frontmatter: Frontmatter,
+): Promise<boolean> => {
+	const cardFile = resolveLinkedCardFileFromFrontmatter(app, sourcePath, frontmatter);
+	if (!cardFile) return false;
+	const markdown = await app.vault.cachedRead(cardFile);
+	if (getMarkdownBody(markdown)) {
+		await removeFrontmatterKey(app, cardFile, TIMELINK_EVENT_KEY);
+		return false;
+	}
+	await app.fileManager.trashFile(cardFile);
+	return true;
 };

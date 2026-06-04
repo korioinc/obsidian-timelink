@@ -41,7 +41,7 @@ void test('resolveLinkedCardFileFromFrontmatter resolves linked file via metadat
 		},
 	};
 
-	const resolved = resolveLinkedCardFileFromFrontmatter(app as never, 'Events/Example.md', {
+	const resolved = resolveLinkedCardFileFromFrontmatter(app, 'Events/Example.md', {
 		[TIMELINK_CARD_KEY]: '[[Cards/My card]]',
 	});
 	assert.strictEqual(resolved, expectedFile);

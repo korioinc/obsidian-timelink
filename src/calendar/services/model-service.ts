@@ -1,8 +1,14 @@
 import { buildEventFilename, toEventFromFrontmatter } from '../../shared/event/note-calendar-utils';
-import type { CalendarEvent, EditableEventResponse, EventLocation } from '../../shared/event/types';
+import type {
+	CalendarEvent,
+	DeleteEventOptions,
+	EditableEventResponse,
+	EventLocation,
+} from '../../shared/event/types';
 import {
 	clearLinkedCardEventBacklink,
 	syncLinkedCardEventBacklink,
+	trashLinkedCardNoteIfBodyEmpty,
 } from './event-card-backlink-service';
 import { TFile, TFolder, normalizePath, type App } from 'obsidian';
 
@@ -61,7 +67,7 @@ export class FullNoteCalendar {
 			return [];
 		}
 
-		const event = toEventFromFrontmatter(frontmatter as Partial<CalendarEvent>, file.basename);
+		const event = toEventFromFrontmatter(frontmatter, file.basename);
 		return [[event, { file, lineNumber: undefined }]];
 	}
 
@@ -141,14 +147,14 @@ export class FullNoteCalendar {
 		return target;
 	}
 
-	async deleteEvent(_location: EventLocation): Promise<void> {
+	async deleteEvent(_location: EventLocation, options?: DeleteEventOptions): Promise<void> {
 		const target = this.resolveEventFileOrThrow(_location);
 		const cachedFrontmatter = this.plugin.app.metadataCache.getFileCache(target)?.frontmatter;
-		await clearLinkedCardEventBacklink(
-			this.plugin.app,
-			target.path,
-			cachedFrontmatter as Record<string, unknown> | null | undefined,
-		);
+		if (options?.deleteLinkedNote) {
+			await trashLinkedCardNoteIfBodyEmpty(this.plugin.app, target.path, cachedFrontmatter);
+		} else {
+			await clearLinkedCardEventBacklink(this.plugin.app, target.path, cachedFrontmatter);
+		}
 
 		await this.plugin.app.fileManager.trashFile(target);
 	}
@@ -195,7 +201,7 @@ export class FullNoteCalendar {
 			eventFile: target,
 			sourcePath,
 			eventTitle: _newEvent.title,
-			frontmatter: cachedFrontmatter as Record<string, unknown> | null | undefined,
+			frontmatter: cachedFrontmatter,
 		});
 	}
 }

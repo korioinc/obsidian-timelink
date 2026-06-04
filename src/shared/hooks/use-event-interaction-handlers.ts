@@ -1,3 +1,4 @@
+import { requestDeleteEventConfirmation } from '../event-form/delete-event-confirmation';
 import {
 	createEventInteractionHandlers,
 	type BuildEventInteractionHandlersParams,
@@ -9,7 +10,7 @@ import { useMemo } from 'preact/hooks';
 
 export type UseEventInteractionHandlersParams = Omit<
 	BuildEventInteractionHandlersParams,
-	'notice'
+	'confirmDeleteEvent' | 'notice'
 > & {
 	app: App;
 };
@@ -43,6 +44,7 @@ export const useEventInteractionHandlers = ({
 				onSaveEvent,
 				onCreateEvent,
 				onDeleteEvent,
+				confirmDeleteEvent: (entry) => requestDeleteEventConfirmation(app, entry[1]),
 				onOpenNote,
 				notice,
 				dateClick,
@@ -54,6 +56,7 @@ export const useEventInteractionHandlers = ({
 			isResizingRef,
 			modal,
 			notice,
+			app,
 			onCreateEvent,
 			onDeleteEvent,
 			onOpenNote,

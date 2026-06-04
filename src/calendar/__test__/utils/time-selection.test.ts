@@ -34,7 +34,7 @@ void test('getDateKeyFromPointer resolves dynamic columns and clamps boundaries'
 		'2026-03-06',
 		'2026-03-07',
 	]);
-	const zeroWidth = getDateKeyFromPointer(300, { ...rect, width: 0 } as DOMRect, ['2026-03-01']);
+	const zeroWidth = getDateKeyFromPointer(300, { ...rect, width: 0 }, ['2026-03-01']);
 
 	assert.strictEqual(single, '2026-03-01');
 	assert.strictEqual(middle, '2026-03-03');

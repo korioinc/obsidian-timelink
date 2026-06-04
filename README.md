@@ -4,6 +4,8 @@ TimeLink is an Obsidian community plugin that connects a calendar, timeline, kan
 
 It is built for linked-note workflows: create notes from cards, create events from cards, keep backlinks in sync, and review dated work from daily views up to a board-wide Gantt overview.
 
+Official community plugin page: [TimeLink](https://community.obsidian.md/plugins/timelink)
+
 ## What TimeLink includes
 
 - **Calendar view**: Create and manage event notes by date.
@@ -86,10 +88,10 @@ It is built for linked-note workflows: create notes from cards, create events fr
 ## Development
 
 ```bash
-npm install
-npm run lint
-npm test
-npm run build
+pnpm install
+pnpm lint
+pnpm test
+pnpm build
 ```
 
 The automated test suite runs on Vitest and includes structure guards for the calendar, timeline, kanban, kanban-list, gantt, and shared layers.

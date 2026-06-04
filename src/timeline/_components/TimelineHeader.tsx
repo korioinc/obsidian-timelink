@@ -58,12 +58,12 @@ export const TimelineHeader = ({
 	onToday,
 }: TimelineHeaderProps): JSX.Element => (
 	<div
-		className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--background-modifier-border)] px-3 py-1"
+		className="flex flex-nowrap items-center gap-2 border-b border-[var(--background-modifier-border)] px-0 py-1"
 		style={{
 			borderColor: 'color-mix(in srgb, var(--background-modifier-border) 26%, transparent)',
 		}}
 	>
-		<div className="flex items-center gap-1.5">
+		<div className="flex shrink-0 items-center gap-1.5">
 			<HeaderIconButton className={iconButtonClass} ariaLabel="Previous day" onActivate={onPrev}>
 				←
 			</HeaderIconButton>
@@ -93,7 +93,7 @@ export const TimelineHeader = ({
 				</svg>
 			</HeaderIconButton>
 		</div>
-		<div className="text-[12px] font-semibold tracking-tight text-[color:var(--text-normal)]">
+		<div className="ml-auto min-w-0 truncate text-right text-[12px] font-semibold tracking-normal whitespace-nowrap text-[color:var(--text-normal)]">
 			{title}
 		</div>
 	</div>

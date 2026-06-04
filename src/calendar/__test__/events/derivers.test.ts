@@ -1,4 +1,7 @@
-import { createAllDayEventSegment as createSegment } from '../../../shared/__test__/helpers/event-factories.ts';
+import {
+	createAllDayEventSegment as createSegment,
+	createTimedEventSegment,
+} from '../../../shared/__test__/helpers/event-factories.ts';
 import { deriveDragAndResizeState } from '../../services/interaction/derivers.ts';
 import { assert, test } from 'vitest';
 
@@ -22,6 +25,36 @@ void test('deriveDragAndResizeState calculates dragRange and dragHoverIndex for 
 	assert.deepEqual(state.dragRange, { start: '2026-03-04', end: '2026-03-05' });
 	assert.strictEqual(state.dragHoverIndex, 3);
 	assert.strictEqual(state.resizeRange, null);
+});
+
+void test('deriveDragAndResizeState treats next-day midnight as exclusive for timed drag range', () => {
+	const dragging = createTimedEventSegment(
+		{
+			date: '2026-06-05',
+			startTime: '21:00',
+			endDate: '2026-06-06',
+			endTime: '00:00',
+		},
+		{ start: '2026-06-05', end: '2026-06-05', span: 1 },
+	);
+	const state = deriveDragAndResizeState(dragging, '2026-06-08', null, null, indexByDateKey);
+
+	assert.deepEqual(state.dragRange, { start: '2026-06-08', end: '2026-06-08' });
+});
+
+void test('deriveDragAndResizeState keeps after-midnight timed drag range across days', () => {
+	const dragging = createTimedEventSegment(
+		{
+			date: '2026-06-05',
+			startTime: '21:00',
+			endDate: '2026-06-06',
+			endTime: '01:00',
+		},
+		{ start: '2026-06-05', end: '2026-06-06', span: 2 },
+	);
+	const state = deriveDragAndResizeState(dragging, '2026-06-08', null, null, indexByDateKey);
+
+	assert.deepEqual(state.dragRange, { start: '2026-06-08', end: '2026-06-09' });
 });
 
 void test('deriveDragAndResizeState clamps resize end when hover date is before start', () => {
