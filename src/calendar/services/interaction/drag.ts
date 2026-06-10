@@ -1,29 +1,50 @@
 import { canMoveEvent } from '../../../shared/event/event-sync';
-import { clampEventDate, diffInDays, parseDateKey } from '../../../shared/event/model-utils';
+import {
+	DEFAULT_EVENT_COLOR,
+	clampEventDate,
+	diffInDays,
+	normalizeEventColor,
+	parseDateKey,
+} from '../../../shared/event/model-utils';
 import type { EditableEventResponse } from '../../../shared/event/types';
 import type { EventSegment } from '../../types';
+
+const DRAG_PREVIEW_OFFSET_X = 12;
+const DRAG_PREVIEW_OFFSET_Y = 12;
+const UNTITLED_DRAG_PREVIEW_LABEL = 'Untitled event';
+
+const getDragPreviewLabel = (segment: EventSegment): string => {
+	const startTime = segment.event.startTime?.trim() ?? '';
+	const title = segment.event.title.trim();
+	const label = [startTime, title].filter(Boolean).join(' ').trim();
+	return label.length > 0 ? label : UNTITLED_DRAG_PREVIEW_LABEL;
+};
+
+const createDragPreviewElement = (target: HTMLElement, segment: EventSegment): HTMLElement => {
+	const preview = target.ownerDocument.createElement('div');
+	preview.classList.add('timelink-drag-preview', 'timelink-drag-preview-label');
+	if (segment.event.completed) {
+		preview.classList.add('timelink-drag-preview-completed');
+	}
+	preview.textContent = getDragPreviewLabel(segment);
+	preview.setCssProps({
+		'--timelink-drag-preview-color':
+			normalizeEventColor(segment.event.color) ?? DEFAULT_EVENT_COLOR,
+	});
+	return preview;
+};
 
 export const createDragImage = (event: DragEvent, segment: EventSegment) => {
 	if (!event.dataTransfer) return;
 	event.dataTransfer.effectAllowed = 'move';
 	event.dataTransfer.setData('text/plain', segment.id);
 	const target = event.currentTarget as HTMLElement | null;
-	if (!target || !target.getBoundingClientRect) return;
-	const rect = target.getBoundingClientRect();
-	const clone = target.cloneNode(true) as HTMLElement;
-	clone.classList.add('timelink-drag-preview');
-	clone.setCssProps({
-		position: 'fixed',
-		top: '-9999px',
-		left: '-9999px',
-		'pointer-events': 'none',
-		opacity: '0.9',
-	});
-	document.body.appendChild(clone);
-	const offsetX = event.clientX - rect.left;
-	const offsetY = event.clientY - rect.top;
-	event.dataTransfer.setDragImage(clone, offsetX, offsetY);
-	window.setTimeout(() => clone.remove(), 0);
+	if (!target?.ownerDocument?.body) return;
+	const preview = createDragPreviewElement(target, segment);
+	target.ownerDocument.body.appendChild(preview);
+	event.dataTransfer.setDragImage(preview, DRAG_PREVIEW_OFFSET_X, DRAG_PREVIEW_OFFSET_Y);
+	const ownerWindow = target.ownerDocument.defaultView ?? window;
+	ownerWindow.setTimeout(() => preview.remove(), 0);
 };
 
 export const handleDragStartFactory = (

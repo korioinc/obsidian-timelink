@@ -158,7 +158,7 @@ function addBoardColorSetting(
 		.setName('Kanban color')
 		.setDesc('Hex color used for the board accent (for example, #4f46e5).')
 		.addText((text) => {
-			text.setPlaceholder('#4f46e5');
+			text.setPlaceholder('#123456');
 			if (settings[KANBAN_BOARD_COLOR_KEY]) {
 				text.setValue(settings[KANBAN_BOARD_COLOR_KEY]);
 			}
@@ -173,51 +173,23 @@ function addBoardColorSetting(
 			const setPreview = (value: string) => {
 				const normalized = normalizeHexColor(value);
 				if (previewEl) {
-					if (normalized) {
-						previewEl.setCssProps({
-							'background-color': normalized,
-							border: '1px solid var(--background-modifier-border)',
-						});
-					} else {
-						previewEl.setCssProps({
-							'background-color': 'transparent',
-							border: '1px solid var(--text-muted)',
-						});
-					}
+					previewEl.setCssProps({
+						'--timelink-board-color': normalized ?? 'transparent',
+						'--timelink-board-color-border': normalized
+							? 'var(--background-modifier-border)'
+							: 'var(--text-muted)',
+					});
 				}
 			};
 			if (inputWrapper) {
-				previewEl = document.createElement('span');
+				previewEl = inputEl.ownerDocument.createElement('span');
 				previewEl.className = 'kanban-color-preview';
-				previewEl.setCssProps({
-					width: '14px',
-					height: '14px',
-					'border-radius': '50%',
-					display: 'inline-flex',
-					'align-items': 'center',
-					'justify-content': 'center',
-				});
-				randomButton = document.createElement('button');
+				randomButton = inputEl.ownerDocument.createElement('button');
 				randomButton.type = 'button';
 				randomButton.className = 'kanban-color-random';
 				randomButton.setText('🎲');
 				randomButton.setAttribute('aria-label', 'Random color');
 				randomButton.setAttribute('title', 'Random color');
-				randomButton.setCssProps({
-					width: '14px',
-					height: '14px',
-					'border-radius': '4px',
-					border: '1px solid var(--background-modifier-border)',
-					background: 'var(--background-secondary)',
-					color: 'var(--text-muted)',
-					display: 'inline-flex',
-					'align-items': 'center',
-					'justify-content': 'center',
-					'font-size': '10px',
-					padding: '0',
-					'line-height': '1',
-					cursor: 'pointer',
-				});
 				randomButton.addEventListener('click', () => {
 					const next = randomHex();
 					text.setValue(next);

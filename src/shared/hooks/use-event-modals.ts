@@ -27,7 +27,7 @@ type ModalController = {
 };
 
 const focusTitleInput = (titleRef: RefObject<HTMLInputElement>) => {
-	requestAnimationFrame(() => {
+	window.requestAnimationFrame(() => {
 		titleRef.current?.focus();
 		titleRef.current?.select();
 	});

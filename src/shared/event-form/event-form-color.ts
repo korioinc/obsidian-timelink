@@ -23,9 +23,15 @@ export const resolveHexColor = (value: string): string | null => {
 	return null;
 };
 
+const getRuntimeDocument = (): Document | null => {
+	if (typeof window === 'undefined') return null;
+	return window.activeDocument ?? window.document;
+};
+
 const toHex = (color: string): string => {
-	if (typeof document === 'undefined') return DEFAULT_EVENT_COLOR_FALLBACK;
-	const canvas = document.createElement('canvas');
+	const runtimeDocument = getRuntimeDocument();
+	if (!runtimeDocument) return DEFAULT_EVENT_COLOR_FALLBACK;
+	const canvas = runtimeDocument.createElement('canvas');
 	const ctx = canvas.getContext('2d');
 	if (!ctx) return DEFAULT_EVENT_COLOR_FALLBACK;
 	ctx.fillStyle = color;
@@ -40,8 +46,12 @@ const toHex = (color: string): string => {
 };
 
 export const getDefaultEventColorHex = (): string => {
-	if (typeof window === 'undefined') return DEFAULT_EVENT_COLOR_FALLBACK;
-	const value = getComputedStyle(document.body).getPropertyValue('--interactive-accent');
+	const runtimeDocument = getRuntimeDocument();
+	if (!runtimeDocument?.body) return DEFAULT_EVENT_COLOR_FALLBACK;
+	const value =
+		runtimeDocument.defaultView
+			?.getComputedStyle(runtimeDocument.body)
+			.getPropertyValue('--interactive-accent') ?? '';
 	if (!value.trim()) return DEFAULT_EVENT_COLOR_FALLBACK;
 	return resolveHexColor(value) ?? toHex(value);
 };

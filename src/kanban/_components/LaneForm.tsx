@@ -17,15 +17,20 @@ export function AddLaneForm({ onSubmit, onCancel }: AddLaneFormProps): h.JSX.Ele
 	}, []);
 
 	useEffect(() => {
+		const listenerDocument =
+			formRef.current?.ownerDocument ??
+			(typeof window === 'undefined' ? null : window.activeDocument);
+		if (!listenerDocument) return;
+		const EventNode = listenerDocument.defaultView?.Node;
 		const handlePointerDown = (event: MouseEvent) => {
 			const target = event.target;
-			if (!(target instanceof Node)) return;
+			if (!EventNode || !(target instanceof EventNode)) return;
 			if (formRef.current?.contains(target)) return;
 			onCancel();
 		};
 
-		document.addEventListener('mousedown', handlePointerDown, true);
-		return () => document.removeEventListener('mousedown', handlePointerDown, true);
+		listenerDocument.addEventListener('mousedown', handlePointerDown, true);
+		return () => listenerDocument.removeEventListener('mousedown', handlePointerDown, true);
 	}, [onCancel]);
 
 	const submit = async () => {

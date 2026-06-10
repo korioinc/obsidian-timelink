@@ -76,24 +76,13 @@ function ensureBoardColorIndicatorButton(actionButtons: ActionButtons, addAction
 	});
 	button.setAttribute('aria-label', label);
 	button.setAttribute('title', label);
-	button.setCssProps({
-		cursor: 'default',
-		display: 'inline-flex',
-		'align-items': 'center',
-		'justify-content': 'center',
-	});
+	button.classList.add('kanban-board-color-button');
 
 	const existingIcon = button.querySelector('svg');
 	if (existingIcon) existingIcon.remove();
 
-	const indicator = document.createElement('span');
+	const indicator = button.ownerDocument.createElement('span');
 	indicator.className = 'kanban-board-color-indicator';
-	indicator.setCssProps({
-		width: '12px',
-		height: '12px',
-		'border-radius': '50%',
-		'box-sizing': 'border-box',
-	});
 	button.appendChild(indicator);
 	actionButtons[BOARD_COLOR_BUTTON_KEY] = button;
 }
@@ -103,16 +92,11 @@ function updateBoardColorIndicator(actionButtons: ActionButtons, color: string |
 	if (!button) return;
 	const indicator = button.querySelector<HTMLSpanElement>('.kanban-board-color-indicator');
 	if (!indicator) return;
-	if (color) {
-		indicator.setCssProps({
-			'background-color': color,
-			border: '1px solid var(--background-modifier-border)',
-		});
-		return;
-	}
 	indicator.setCssProps({
-		'background-color': 'transparent',
-		border: '1px solid var(--text-muted)',
+		'--timelink-board-color': color ?? 'transparent',
+		'--timelink-board-color-border': color
+			? 'var(--background-modifier-border)'
+			: 'var(--text-muted)',
 	});
 }
 

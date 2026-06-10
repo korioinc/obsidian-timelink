@@ -1,7 +1,7 @@
 export const CARD_TITLE_LINK_CLICK_SUPPRESSION_MS = 250;
 
 const getInteractionTimestamp = (): number => {
-	return globalThis.performance?.now() ?? Date.now();
+	return (typeof window === 'undefined' ? undefined : window.performance?.now()) ?? Date.now();
 };
 
 export type CardTitleLinkClickGuard = {

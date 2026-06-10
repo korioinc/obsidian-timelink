@@ -1,1 +1,77 @@
 @import 'tailwindcss';
+
+@layer components {
+	.timelink-drag-preview {
+		position: fixed;
+		top: -9999px;
+		left: -9999px;
+		pointer-events: none;
+		opacity: 0.9;
+	}
+
+	.timelink-drag-preview-label {
+		box-sizing: border-box;
+		display: inline-block;
+		width: max-content;
+		min-width: 24px;
+		max-width: min(320px, calc(100vw - 32px));
+		overflow: hidden;
+		white-space: nowrap;
+		text-overflow: ellipsis;
+		border-radius: 6px;
+		border: 1px solid var(--timelink-drag-preview-color, var(--interactive-accent));
+		background-color: var(--timelink-drag-preview-color, var(--interactive-accent));
+		color: var(--text-on-accent);
+		padding: 2px 8px;
+		font-size: 11px;
+		line-height: 16px;
+		font-weight: 600;
+	}
+
+	.timelink-drag-preview-completed {
+		opacity: 0.7;
+	}
+
+	.kanban-board-color-button {
+		cursor: default;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.kanban-board-color-indicator {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+		box-sizing: border-box;
+		background-color: var(--timelink-board-color, transparent);
+		border: 1px solid var(--timelink-board-color-border, var(--text-muted));
+	}
+
+	.kanban-color-preview {
+		width: 14px;
+		height: 14px;
+		border-radius: 50%;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		background-color: var(--timelink-board-color, transparent);
+		border: 1px solid var(--timelink-board-color-border, var(--text-muted));
+	}
+
+	.kanban-color-random {
+		width: 14px;
+		height: 14px;
+		border-radius: 4px;
+		border: 1px solid var(--background-modifier-border);
+		background: var(--background-secondary);
+		color: var(--text-muted);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 10px;
+		padding: 0;
+		line-height: 1;
+		cursor: pointer;
+	}
+}

@@ -66,7 +66,9 @@ export function KanbanRoot({
 		);
 	}
 
-	const portalTarget = typeof document === 'undefined' ? null : document.body;
+	const portalTarget =
+		addLaneAnchorEl?.ownerDocument.body ??
+		(typeof window === 'undefined' ? null : window.activeDocument.body);
 	const totalCards = board.lanes.reduce((count, lane) => count + lane.cards.length, 0);
 	const handleCardDragStart = () => setIsCardDragging(true);
 	const handleCardDragEnd = () => setIsCardDragging(false);

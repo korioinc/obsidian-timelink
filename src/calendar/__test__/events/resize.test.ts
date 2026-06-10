@@ -3,7 +3,20 @@ import {
 	handleResizeStartFactory,
 } from '../../services/interaction/resize.ts';
 import type { CalendarEvent, EventSegment } from '../../types';
-import { assert, test } from 'vitest';
+import { afterEach, assert, test, vi } from 'vitest';
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
+
+const stubWindowTimers = (): void => {
+	vi.stubGlobal('window', {
+		setTimeout(callback: () => void): number {
+			callback();
+			return 0;
+		},
+	});
+};
 
 const createSegment = (
 	eventOverrides: Partial<CalendarEvent> = {},
@@ -47,55 +60,48 @@ void test('createResizeEffectHandlers returns null when no active resizing exist
 });
 
 void test('createResizeEffectHandlers updates hover on pointer move and clamps end date on pointer up', async () => {
-	const originalWindow = (globalThis as { window?: typeof globalThis }).window;
-	(globalThis as { window: typeof globalThis }).window = globalThis;
-	try {
-		const resizing = createSegment({ date: '2026-03-03', endDate: '2026-03-05' });
-		let hover: string | null = '2026-03-04';
-		let activeResizing: EventSegment | null = resizing;
-		let previousDate: string | undefined;
-		let nextDate: string | undefined;
-		let nextEndDate: string | null | undefined;
-		const isResizingRef = { current: true };
+	stubWindowTimers();
+	const resizing = createSegment({ date: '2026-03-03', endDate: '2026-03-05' });
+	let hover: string | null = '2026-03-04';
+	let activeResizing: EventSegment | null = resizing;
+	let previousDate: string | undefined;
+	let nextDate: string | undefined;
+	let nextEndDate: string | null | undefined;
+	const isResizingRef = { current: true };
 
-		const handlers = createResizeEffectHandlers(
-			resizing,
-			'2026-03-01',
-			(clientX) => (clientX > 300 ? '2026-03-06' : null),
-			(next) => {
-				hover = next;
-			},
-			(next, previous) => {
-				previousDate = previous[0].date;
-				nextDate = next[0].date;
-				nextEndDate = next[0].endDate;
-			},
-			(next) => {
-				activeResizing = next;
-			},
-			isResizingRef,
-		);
+	const handlers = createResizeEffectHandlers(
+		resizing,
+		'2026-03-01',
+		(clientX) => (clientX > 300 ? '2026-03-06' : null),
+		(next) => {
+			hover = next;
+		},
+		(next, previous) => {
+			previousDate = previous[0].date;
+			nextDate = next[0].date;
+			nextEndDate = next[0].endDate;
+		},
+		(next) => {
+			activeResizing = next;
+		},
+		isResizingRef,
+	);
 
-		assert.ok(handlers);
-		handlers.handlePointerMove({ clientX: 500, clientY: 200 } as PointerEvent);
-		assert.strictEqual(hover, '2026-03-06');
+	assert.ok(handlers);
+	handlers.handlePointerMove({ clientX: 500, clientY: 200 } as PointerEvent);
+	assert.strictEqual(hover, '2026-03-06');
 
-		handlers.handlePointerUp();
-		await new Promise((resolve) => setTimeout(resolve, 0));
+	handlers.handlePointerUp();
+	await new Promise<void>((resolve) => {
+		window.setTimeout(() => resolve(), 0);
+	});
 
-		assert.strictEqual(previousDate, '2026-03-03');
-		assert.strictEqual(nextDate, '2026-03-03');
-		assert.strictEqual(nextEndDate, undefined);
-		assert.strictEqual(activeResizing, null);
-		assert.strictEqual(hover, null);
-		assert.strictEqual(isResizingRef.current, false);
-	} finally {
-		if (originalWindow) {
-			(globalThis as { window: typeof globalThis }).window = originalWindow;
-		} else {
-			delete (globalThis as { window?: typeof globalThis }).window;
-		}
-	}
+	assert.strictEqual(previousDate, '2026-03-03');
+	assert.strictEqual(nextDate, '2026-03-03');
+	assert.strictEqual(nextEndDate, undefined);
+	assert.strictEqual(activeResizing, null);
+	assert.strictEqual(hover, null);
+	assert.strictEqual(isResizingRef.current, false);
 });
 
 void test('handleResizeStartFactory stores target segment and initial hover date', () => {

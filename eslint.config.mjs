@@ -2,12 +2,10 @@ import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 import eslintJson from '@eslint/json';
 import tsparser from '@typescript-eslint/parser';
 import eslintConfigPrettier from 'eslint-config-prettier';
-import importPlugin from 'eslint-plugin-import';
 import obsidianmd from 'eslint-plugin-obsidianmd';
 import prettier from 'eslint-plugin-prettier';
 import pluginPromise from 'eslint-plugin-promise';
 import { globalIgnores } from 'eslint/config';
-import globals from 'globals';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
@@ -15,37 +13,28 @@ import tseslint from 'typescript-eslint';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const obsidianTypedRules = {
+	'obsidianmd/no-plugin-as-component': 'off',
+	'obsidianmd/no-unsupported-api': 'off',
+	'obsidianmd/no-view-references-in-plugin': 'off',
+	'obsidianmd/prefer-file-manager-trash-file': 'off',
+	'obsidianmd/prefer-instanceof': 'off',
+};
+
 export default tseslint.config(
-	{
-		languageOptions: {
-			globals: {
-				...globals.browser,
-				...globals.node,
-			},
-			parserOptions: {
-				projectService: {
-					allowDefaultProject: ['eslint.config.mjs', 'manifest.json', 'vitest.config.ts'],
-				},
-				tsconfigRootDir: __dirname,
-				extraFileExtensions: ['.json'],
-			},
-		},
-	},
 	...obsidianmd.configs.recommended,
 	{
 		files: ['**/*.{ts,tsx}'],
 		languageOptions: {
 			parser: tsparser,
 			parserOptions: {
-				// Keep projectService in the shared block above; typescript-eslint treats
-				// parserOptions.project and parserOptions.projectService as alternatives.
+				project: './tsconfig.json',
 				tsconfigRootDir: __dirname,
 			},
 		},
 		plugins: {
 			'eslint-comments': eslintComments,
 			obsidianmd,
-			import: importPlugin,
 			prettier,
 			promise: pluginPromise,
 		},
@@ -62,6 +51,7 @@ export default tseslint.config(
 			prettier,
 		},
 		rules: {
+			...obsidianTypedRules,
 			'prettier/prettier': 'error',
 		},
 	},
@@ -73,6 +63,7 @@ export default tseslint.config(
 			obsidianmd,
 		},
 		rules: {
+			...obsidianTypedRules,
 			'no-irregular-whitespace': 'off',
 			'obsidianmd/validate-manifest': 'error',
 		},
@@ -80,6 +71,7 @@ export default tseslint.config(
 	{
 		files: ['package.json'],
 		rules: {
+			...obsidianTypedRules,
 			'depend/ban-dependencies': 'off',
 		},
 	},
@@ -87,8 +79,11 @@ export default tseslint.config(
 	globalIgnores([
 		'node_modules',
 		'dist',
+		'build-tailwind.mjs',
+		'eslint.config.mjs',
 		'esbuild.config.mjs',
 		'eslint.config.js',
+		'vitest.config.ts',
 		'version-bump.mjs',
 		'versions.json',
 		'main.js',

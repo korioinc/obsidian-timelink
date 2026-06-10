@@ -1,12 +1,17 @@
 import {
 	beginDragFromPopoverFactory,
 	createDragCaptureHandlers,
+	createDragImage,
 	handleDragEndFactory,
 	handleDragStartFactory,
 	handleDropFactory,
 } from '../../services/interaction/drag.ts';
 import type { CalendarEvent, EventSegment } from '../../types';
-import { assert, test } from 'vitest';
+import { afterEach, assert, test, vi } from 'vitest';
+
+afterEach(() => {
+	vi.unstubAllGlobals();
+});
 
 const createSegment = (
 	eventOverrides: Partial<CalendarEvent> = {},
@@ -78,6 +83,149 @@ void test('handleDragStartFactory normalizes base dates and fallback hover key',
 	assert.strictEqual(capturedEndDate, '2026-03-03');
 	assert.strictEqual(nextHover, '2026-03-02');
 	assert.strictEqual(didDropRef.current, false);
+});
+
+void test('createDragImage appends compact label preview to the target document', () => {
+	const segment = createSegment(
+		{
+			title: 'Deep work',
+			startTime: '09:30',
+			color: '#abcdef',
+			completed: true,
+		},
+		{ span: 4 },
+	);
+	const classes = new Set<string>();
+	const cssProps: Record<string, string> = {};
+	let removed = false;
+	const preview = {
+		classList: {
+			add: (...classNames: string[]) => {
+				for (const className of classNames) {
+					classes.add(className);
+				}
+			},
+		},
+		setCssProps: (props: Record<string, string>) => {
+			Object.assign(cssProps, props);
+		},
+		remove: () => {
+			removed = true;
+		},
+		textContent: '',
+	} as unknown as HTMLElement;
+	let appended: HTMLElement | null = null;
+	let createdTagName: string | null = null;
+	const ownerDocument = {
+		createElement: (tagName: string) => {
+			createdTagName = tagName;
+			return preview;
+		},
+		body: {
+			appendChild: (element: HTMLElement) => {
+				appended = element;
+				return element;
+			},
+		},
+		defaultView: {
+			setTimeout: (callback: () => void): number => {
+				callback();
+				return 0;
+			},
+		},
+	} as unknown as Document;
+	let cloneCalled = false;
+	const target = {
+		ownerDocument,
+		cloneNode: () => {
+			cloneCalled = true;
+			return {};
+		},
+	} as unknown as HTMLElement;
+	let dataTransferType: string | null = null;
+	let dataTransferValue: string | null = null;
+	let dragImage: HTMLElement | null = null;
+	let offsetX: number | null = null;
+	let offsetY: number | null = null;
+	const dataTransfer = {
+		effectAllowed: 'none',
+		setData: (type: string, value: string) => {
+			dataTransferType = type;
+			dataTransferValue = value;
+		},
+		setDragImage: (image: HTMLElement, x: number, y: number) => {
+			dragImage = image;
+			offsetX = x;
+			offsetY = y;
+		},
+	} as unknown as DataTransfer;
+
+	createDragImage(
+		{
+			clientX: 500,
+			clientY: 200,
+			currentTarget: target,
+			dataTransfer,
+		} as unknown as DragEvent,
+		segment,
+	);
+
+	assert.strictEqual(dataTransfer.effectAllowed, 'move');
+	assert.strictEqual(dataTransferType, 'text/plain');
+	assert.strictEqual(dataTransferValue, segment.id);
+	assert.strictEqual(createdTagName, 'div');
+	assert.strictEqual(appended, preview);
+	assert.strictEqual(dragImage, preview);
+	assert.strictEqual(cloneCalled, false);
+	assert.strictEqual(offsetX, 12);
+	assert.strictEqual(offsetY, 12);
+	assert.strictEqual(preview.textContent, '09:30 Deep work');
+	assert.strictEqual(classes.has('timelink-drag-preview'), true);
+	assert.strictEqual(classes.has('timelink-drag-preview-label'), true);
+	assert.strictEqual(classes.has('timelink-drag-preview-completed'), true);
+	assert.strictEqual(cssProps['--timelink-drag-preview-color'], '#abcdef');
+	assert.strictEqual(removed, true);
+});
+
+void test('createDragImage uses fallback label for blank event titles', () => {
+	const segment = createSegment({ title: '   ', startTime: '   ', color: '   ' });
+	const preview = {
+		classList: {
+			add: () => undefined,
+		},
+		setCssProps: () => undefined,
+		remove: () => undefined,
+		textContent: '',
+	} as unknown as HTMLElement;
+	const ownerDocument = {
+		createElement: () => preview,
+		body: {
+			appendChild: (element: HTMLElement) => element,
+		},
+		defaultView: {
+			setTimeout: (callback: () => void): number => {
+				callback();
+				return 0;
+			},
+		},
+	} as unknown as Document;
+	const dataTransfer = {
+		effectAllowed: 'none',
+		setData: () => undefined,
+		setDragImage: () => undefined,
+	} as unknown as DataTransfer;
+
+	createDragImage(
+		{
+			clientX: 0,
+			clientY: 0,
+			currentTarget: { ownerDocument } as HTMLElement,
+			dataTransfer,
+		} as unknown as DragEvent,
+		segment,
+	);
+
+	assert.strictEqual(preview.textContent, 'Untitled event');
 });
 
 void test('handleDropFactory updates movable event and clears drag state', () => {
