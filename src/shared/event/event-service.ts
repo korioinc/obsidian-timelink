@@ -14,7 +14,10 @@ import type {
 
 export type EventServiceCalendar = {
 	createEvent: (event: CalendarEvent, body?: string) => Promise<EventLocation>;
-	deleteEvent: (location: EventLocation, options?: DeleteEventOptions) => Promise<void>;
+	deleteEvent: (
+		location: EventLocation,
+		options?: DeleteEventOptions,
+	) => Promise<EventLocation | void>;
 	getEvents: () => Promise<EditableEventResponse[]>;
 	modifyEvent: (
 		location: EventLocation,
@@ -35,6 +38,17 @@ export type EventServiceDeps = {
 	scheduleReload: () => void;
 	notice: (message: string) => void;
 	updateLocation: EventServiceUpdateLocation;
+	beginModification: (location: EventLocation) => () => boolean;
+};
+
+export const createEventModificationGuard = (): EventServiceDeps['beginModification'] => {
+	const generationsByLocation = new Map<string, number>();
+	return (location) => {
+		const key = `${location.file.path}:${location.lineNumber ?? ''}`;
+		const generation = (generationsByLocation.get(key) ?? 0) + 1;
+		generationsByLocation.set(key, generation);
+		return () => generationsByLocation.get(key) === generation;
+	};
 };
 
 export const loadEventEntries = async (
@@ -57,7 +71,14 @@ type ModifyEventFlowOptions = {
 	applyFailureState: (updatedLocation: EventLocation) => void;
 	logMessage: string;
 	noticeMessage: string;
+	uncertainNoticeMessage: string;
 };
+
+const isEventStateUncertain = (error: unknown): boolean =>
+	typeof error === 'object' &&
+	error !== null &&
+	'eventStateUncertain' in error &&
+	(error as { eventStateUncertain?: unknown }).eventStateUncertain === true;
 
 const runModifyEventFlow = async (
 	deps: EventServiceDeps,
@@ -66,15 +87,23 @@ const runModifyEventFlow = async (
 	options: ModifyEventFlowOptions,
 ): Promise<void> => {
 	let updatedLocation = previous[1];
+	const isCurrent = deps.beginModification(previous[1]);
 	options.applyOptimisticState();
 	deps.scheduleReload();
 	try {
 		await deps.calendar.modifyEvent(previous[1], next[0], (location) => {
 			updatedLocation = location;
-			deps.updateLocation(previous[1], location);
+			if (isCurrent()) deps.updateLocation(previous[1], location);
 		});
-		options.applySuccessState(updatedLocation);
+		if (isCurrent()) options.applySuccessState(updatedLocation);
 	} catch (error) {
+		if (isEventStateUncertain(error)) {
+			deps.scheduleReload();
+			console.error(options.logMessage, error);
+			deps.notice(options.uncertainNoticeMessage);
+			return;
+		}
+		if (!isCurrent()) return;
 		options.applyFailureState(updatedLocation);
 		console.error(options.logMessage, error);
 		deps.notice(options.noticeMessage);
@@ -93,11 +122,14 @@ export const saveEventEntry = async (
 		applySuccessState: (updatedLocation) => {
 			deps.setEvents((current) => updateEventEntry(current, previous[1], updatedLocation, next[0]));
 		},
-		applyFailureState: () => {
-			deps.setEvents((current) => updateEventEntry(current, previous[1], previous[1], previous[0]));
+		applyFailureState: (updatedLocation) => {
+			deps.setEvents((current) =>
+				updateEventEntry(current, updatedLocation, previous[1], previous[0]),
+			);
 		},
 		logMessage: 'Failed to modify calendar event',
 		noticeMessage: 'Failed to save the event.',
+		uncertainNoticeMessage: 'The event may be partially saved. Reloading the calendar.',
 	});
 };
 
@@ -118,6 +150,7 @@ export const moveEventEntry = async (
 		},
 		logMessage: 'Failed to move calendar event',
 		noticeMessage: 'Failed to move the event.',
+		uncertainNoticeMessage: 'The event may be partially moved. Reloading the calendar.',
 	});
 };
 
@@ -126,11 +159,16 @@ export const deleteEventEntry = async (
 	entry: EditableEventResponse,
 	options?: DeleteEventOptions,
 ): Promise<void> => {
+	deps.beginModification(entry[1]);
 	deps.scheduleReload();
 	try {
-		await deps.calendar.deleteEvent(entry[1], options);
+		const deletedLocation = await deps.calendar.deleteEvent(entry[1], options);
 		deps.setEvents((current) =>
-			current.filter(([, location]) => !isSameEventLocation(location, entry[1])),
+			current.filter(
+				([, location]) =>
+					!isSameEventLocation(location, entry[1]) &&
+					(!deletedLocation || !isSameEventLocation(location, deletedLocation)),
+			),
 		);
 	} catch (error) {
 		console.error('Failed to delete calendar event', error);

@@ -1,9 +1,7 @@
 import {
-	buildLinkedCardPathSet,
 	registerKanbanCardEventIndicatorRefresh,
 	shouldRefreshCardEventIndicators,
 } from '../services/event-indicator-refresh-service.ts';
-import type { KanbanBoard } from '../types';
 import { assert, test } from 'vitest';
 
 type MetadataEventName = 'changed' | 'deleted';
@@ -19,48 +17,24 @@ type MetadataDeletedCallback = (
 	prevCache: Record<string, unknown> | null,
 ) => void;
 type VaultRenameCallback = (file: { path: string }, oldPath: string) => void;
+type FakeEventRef = { unregister: () => void };
 
 type FakeApp = {
 	metadataCache: {
-		getFirstLinkpathDest: (
-			linkpath: string,
-			sourcePath: string,
-		) => { path: string; basename: string } | null;
 		on: (
 			event: MetadataEventName,
 			callback: MetadataChangedCallback | MetadataDeletedCallback,
-		) => void;
-		off: (
-			event: MetadataEventName,
-			callback: MetadataChangedCallback | MetadataDeletedCallback,
-		) => void;
+		) => FakeEventRef;
+		offref: (eventRef: FakeEventRef) => void;
 		triggerChanged: (path: string) => void;
 		triggerDeleted: (path: string) => void;
 	};
 	vault: {
-		on: (event: VaultEventName, callback: VaultRenameCallback) => void;
-		off: (event: VaultEventName, callback: VaultRenameCallback) => void;
+		on: (event: VaultEventName, callback: VaultRenameCallback) => FakeEventRef;
+		offref: (eventRef: FakeEventRef) => void;
 		triggerRename: (path: string, oldPath: string) => void;
 	};
 };
-
-const createBoard = (): KanbanBoard => ({
-	lanes: [
-		{
-			id: 'lane-1',
-			title: 'Todo',
-			lineStart: 1,
-			lineEnd: 2,
-			cards: [
-				{ id: 'card-1', title: '[[cards/a]]', lineStart: 2, blockId: undefined },
-				{ id: 'card-2', title: '[[cards/a]]', lineStart: 3, blockId: undefined },
-				{ id: 'card-3', title: '[[cards/b]]', lineStart: 4, blockId: undefined },
-				{ id: 'card-4', title: 'plain title', lineStart: 5, blockId: undefined },
-			],
-		},
-	],
-	settings: {},
-});
 
 const createFakeApp = (): FakeApp => {
 	const metadataListeners = new Map<
@@ -68,10 +42,6 @@ const createFakeApp = (): FakeApp => {
 		Set<MetadataChangedCallback | MetadataDeletedCallback>
 	>();
 	const vaultListeners = new Map<VaultEventName, Set<VaultRenameCallback>>();
-	const linkDestinations = new Map<string, { path: string; basename: string }>();
-
-	linkDestinations.set('boards/demo.md::cards/a', { path: 'cards/a.md', basename: 'a' });
-	linkDestinations.set('boards/demo.md::cards/b', { path: 'cards/b.md', basename: 'b' });
 
 	const ensureMetadata = (event: MetadataEventName) => {
 		const current = metadataListeners.get(event);
@@ -90,13 +60,16 @@ const createFakeApp = (): FakeApp => {
 
 	return {
 		metadataCache: {
-			getFirstLinkpathDest: (linkpath, sourcePath) =>
-				linkDestinations.get(`${sourcePath}::${linkpath}`) ?? null,
 			on: (event, callback) => {
 				ensureMetadata(event).add(callback);
+				return {
+					unregister: () => {
+						ensureMetadata(event).delete(callback);
+					},
+				};
 			},
-			off: (event, callback) => {
-				ensureMetadata(event).delete(callback);
+			offref: (eventRef) => {
+				eventRef.unregister();
 			},
 			triggerChanged: (path) => {
 				for (const callback of ensureMetadata('changed')) {
@@ -112,9 +85,14 @@ const createFakeApp = (): FakeApp => {
 		vault: {
 			on: (event, callback) => {
 				ensureVault(event).add(callback);
+				return {
+					unregister: () => {
+						ensureVault(event).delete(callback);
+					},
+				};
 			},
-			off: (event, callback) => {
-				ensureVault(event).delete(callback);
+			offref: (eventRef) => {
+				eventRef.unregister();
 			},
 			triggerRename: (path, oldPath) => {
 				for (const callback of ensureVault('rename')) {
@@ -124,19 +102,6 @@ const createFakeApp = (): FakeApp => {
 		},
 	};
 };
-
-void test('buildLinkedCardPathSet collects unique linked card paths from board titles', () => {
-	const board = createBoard();
-	const app = createFakeApp();
-
-	const paths = buildLinkedCardPathSet(
-		app as unknown as import('obsidian').App,
-		board,
-		'boards/demo.md',
-	);
-
-	assert.deepEqual([...paths].sort(), ['cards/a.md', 'cards/b.md']);
-});
 
 void test('shouldRefreshCardEventIndicators matches changed and renamed linked card paths', () => {
 	const linkedCardPaths = new Set(['cards/a.md']);

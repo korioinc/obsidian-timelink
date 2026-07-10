@@ -20,7 +20,7 @@ export const MorePopover = ({
 	dayGridRef: { current: HTMLDivElement | null };
 	onClose: () => void;
 	onEventClick: (segment: EventSegment) => void;
-	onDragStartFromPopover: (event: DragEvent, segment: EventSegment) => void;
+	onDragStartFromPopover: (event: DragEvent, segment: EventSegment, sourceDateKey: string) => void;
 	onDragEnd: () => void;
 	onToggleCompleted: (segment: EventSegment) => void;
 	DEFAULT_EVENT_COLOR: string;
@@ -81,7 +81,7 @@ export const MorePopover = ({
 										}}
 										onDragStart={(event) => {
 											event.stopPropagation();
-											onDragStartFromPopover(event, popoverSegment);
+											onDragStartFromPopover(event, popoverSegment, moreMenu.dateKey);
 										}}
 										onDragEnd={(event) => {
 											event.stopPropagation();

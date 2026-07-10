@@ -1,7 +1,7 @@
 import { getLeafFilePath } from '../services/leaf-service';
 import { createCardTitleLinkClickGuard } from '../utils/card-title-link-click-guard';
 import type { App, Component } from 'obsidian';
-import { MarkdownRenderer, TFile } from 'obsidian';
+import { MarkdownRenderer, Notice, TFile } from 'obsidian';
 import { h } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 
@@ -53,12 +53,18 @@ export function CardTitleRenderer({
 			host,
 			markdownContext.sourcePath,
 			markdownContext.component,
-		).then(() => {
-			if (cancelled) return;
-			host.querySelectorAll<HTMLAnchorElement>('a').forEach((anchor) => {
-				anchor.setAttribute('draggable', 'false');
+		)
+			.then(() => {
+				if (cancelled) return;
+				host.querySelectorAll<HTMLAnchorElement>('a').forEach((anchor) => {
+					anchor.setAttribute('draggable', 'false');
+				});
+			})
+			.catch((error: unknown) => {
+				if (cancelled) return;
+				console.error('Failed to render kanban card title', error);
+				host.textContent = title;
 			});
-		});
 
 		const handleDragInteraction = () => {
 			linkClickGuardRef.current.noteDragInteraction();
@@ -77,7 +83,12 @@ export function CardTitleRenderer({
 			if (!href) return;
 			event.preventDefault();
 			event.stopPropagation();
-			void openCardTitleLink(markdownContext.app, href, markdownContext.sourcePath);
+			void openCardTitleLink(markdownContext.app, href, markdownContext.sourcePath).catch(
+				(error: unknown) => {
+					console.error('Failed to open kanban card link', error);
+					new Notice('Failed to open card link.');
+				},
+			);
 		};
 
 		dragContainer?.addEventListener('dragstart', handleDragInteraction);

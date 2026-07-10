@@ -10,6 +10,8 @@ export function moveCard(
 	toLaneId: string,
 	toIndex: number,
 ): KanbanBoard {
+	if (!board.lanes.some((lane) => lane.id === toLaneId)) return board;
+
 	let movingCard: KanbanCard | null = null;
 
 	const lanes = board.lanes.map((lane) => {
@@ -41,8 +43,6 @@ export function addLane(board: KanbanBoard, title: string): KanbanBoard {
 	const nextLane: KanbanLane = {
 		id: `lane-${board.lanes.length}-${Date.now()}`,
 		title: title.trim(),
-		lineStart: 0,
-		lineEnd: 0,
 		cards: [],
 	};
 	return { lanes: [...board.lanes, nextLane], settings: board.settings };
@@ -77,7 +77,6 @@ export function insertCardAt(
 			const nextCard: KanbanCard = {
 				id: buildCardId(lane),
 				title: normalizedTitle,
-				lineStart: lane.lineStart,
 				blockId: normalizedBlockId,
 			};
 			const clampedIndex = Math.max(0, Math.min(index, nextCards.length));
@@ -95,7 +94,6 @@ export function addCard(board: KanbanBoard, laneId: string, title: string): Kanb
 			const card: KanbanCard = {
 				id: buildCardId(lane),
 				title,
-				lineStart: lane.lineStart,
 				blockId: undefined,
 			};
 			return { ...lane, cards: [...lane.cards, card] };
@@ -180,19 +178,33 @@ export function hasCard(board: KanbanBoard, cardId: string): boolean {
 	return findCardById(board, cardId) !== null;
 }
 
-export function buildCardTitleMap(board: KanbanBoard | null): Map<string, string> {
-	return new Map(
-		board?.lanes.flatMap((lane) => lane.cards.map((card) => [card.id, card.title])) ?? [],
-	);
-}
+type ResolvedCardLinkState = {
+	path: string;
+	hasEvent: boolean;
+} | null;
 
-export function buildCardEventMap(
+export function buildCardDerivedState(
 	board: KanbanBoard | null,
-	hasLinkedEvent: (title: string) => boolean,
-): Map<string, boolean> {
-	return new Map(
-		board?.lanes.flatMap((lane) =>
-			lane.cards.map((card) => [card.id, hasLinkedEvent(card.title)] as const),
-		) ?? [],
-	);
+	resolveLinkState: (title: string) => ResolvedCardLinkState,
+): {
+	titleById: Map<string, string>;
+	hasEventById: Map<string, boolean>;
+	linkedPaths: Set<string>;
+} {
+	const titleById = new Map<string, string>();
+	const hasEventById = new Map<string, boolean>();
+	const linkedPaths = new Set<string>();
+
+	if (!board) return { titleById, hasEventById, linkedPaths };
+
+	for (const lane of board.lanes) {
+		for (const card of lane.cards) {
+			titleById.set(card.id, card.title);
+			const linkState = resolveLinkState(card.title);
+			hasEventById.set(card.id, linkState?.hasEvent ?? false);
+			if (linkState) linkedPaths.add(linkState.path);
+		}
+	}
+
+	return { titleById, hasEventById, linkedPaths };
 }

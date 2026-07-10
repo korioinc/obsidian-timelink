@@ -119,11 +119,17 @@ export function LaneColumn({
 		onAddCard,
 	});
 
-	const openCardOptions = (event: MouseEvent, cardId: string, title: string) => {
+	const openCardOptions = (
+		event: MouseEvent | KeyboardEvent,
+		anchorEl: HTMLElement,
+		cardId: string,
+		title: string,
+	) => {
 		cardTitleRef.current.set(cardId, title);
 		showCardMenu({
 			app: markdownContext.app,
 			event,
+			anchorEl,
 			sourcePath: markdownContext.sourcePath,
 			cardId,
 			title,

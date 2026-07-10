@@ -33,7 +33,24 @@ type SyncLinkedCardEventBacklinkParams = {
 	sourcePath: string;
 	eventTitle: string;
 	frontmatter: Frontmatter;
+	rollbackSnapshot?: LinkedCardEventBacklinkSnapshot;
 };
+
+type LinkedCardEventBacklinkSnapshot = {
+	file: FrontmatterFileLike | null;
+	captured: boolean;
+	present: boolean;
+	value: unknown;
+	expectedValue: unknown;
+};
+
+export const createLinkedCardEventBacklinkSnapshot = (): LinkedCardEventBacklinkSnapshot => ({
+	file: null,
+	captured: false,
+	present: false,
+	value: undefined,
+	expectedValue: undefined,
+});
 
 type LinkedCardTrashApp = FrontmatterMetadataApp & {
 	metadataCache: FrontmatterMetadataApp['metadataCache'] & {
@@ -71,11 +88,48 @@ export const syncLinkedCardEventBacklink = async ({
 	sourcePath,
 	eventTitle,
 	frontmatter,
+	rollbackSnapshot,
 }: SyncLinkedCardEventBacklinkParams): Promise<void> => {
 	const cardFile = resolveLinkedCardFileFromFrontmatter(app, sourcePath, frontmatter);
 	if (!cardFile) return;
 	const eventLink = app.fileManager.generateMarkdownLink(eventFile, cardFile.path, '', eventTitle);
-	await setFrontmatterValue(app, cardFile, TIMELINK_EVENT_KEY, eventLink);
+	if (!rollbackSnapshot) {
+		await setFrontmatterValue(app, cardFile, TIMELINK_EVENT_KEY, eventLink);
+		return;
+	}
+	rollbackSnapshot.file = cardFile;
+	await app.fileManager.processFrontMatter(cardFile, (cardFrontmatter) => {
+		rollbackSnapshot.captured = true;
+		rollbackSnapshot.present = Object.prototype.hasOwnProperty.call(
+			cardFrontmatter,
+			TIMELINK_EVENT_KEY,
+		);
+		rollbackSnapshot.value = cardFrontmatter[TIMELINK_EVENT_KEY];
+		rollbackSnapshot.expectedValue = eventLink;
+		cardFrontmatter[TIMELINK_EVENT_KEY] = eventLink;
+	});
+};
+
+export const restoreLinkedCardEventBacklink = async (
+	app: FrontmatterMutationApp,
+	snapshot: LinkedCardEventBacklinkSnapshot,
+): Promise<void> => {
+	if (!snapshot.file || !snapshot.captured) return;
+	let fullyRestored = true;
+	await app.fileManager.processFrontMatter(snapshot.file, (frontmatter) => {
+		if (!Object.is(frontmatter[TIMELINK_EVENT_KEY], snapshot.expectedValue)) {
+			fullyRestored = false;
+			return;
+		}
+		if (snapshot.present) {
+			frontmatter[TIMELINK_EVENT_KEY] = snapshot.value;
+		} else {
+			delete frontmatter[TIMELINK_EVENT_KEY];
+		}
+	});
+	if (!fullyRestored) {
+		throw new Error('Linked card frontmatter changed while the event was rolling back.');
+	}
 };
 
 export const trashLinkedCardNoteIfBodyEmpty = async (

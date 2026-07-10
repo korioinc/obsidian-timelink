@@ -1,13 +1,35 @@
+import { createNotice } from '../shared/services/notice-service';
 import { KanbanBoardCard } from './_components/kanban-board-card';
 import { KANBAN_LIST_MAX_DEPTH } from './constants';
 import { useKanbanListData } from './hooks/use-kanban-list-data';
 import type { KanbanListPluginContext } from './types';
-import { Notice, TFile } from 'obsidian';
+import type { TFile } from 'obsidian';
 import { render } from 'preact';
 import { useCallback, useMemo } from 'preact/hooks';
 
 type KanbanListUIProps = {
 	plugin: KanbanListPluginContext;
+};
+
+const notice = createNotice();
+
+const isTFileLike = (file: unknown): file is TFile => {
+	if (!file || typeof file !== 'object') return false;
+	const candidate = file as { path?: unknown; extension?: unknown };
+	return typeof candidate.path === 'string' && typeof candidate.extension === 'string';
+};
+
+export const runKanbanListAction = async (
+	label: string,
+	failureMessage: string,
+	action: () => Promise<void>,
+): Promise<void> => {
+	try {
+		await action();
+	} catch (error) {
+		console.error(label, error);
+		notice(failureMessage);
+	}
 };
 
 const KanbanListRoot = ({ plugin }: KanbanListUIProps) => {
@@ -28,12 +50,14 @@ const KanbanListRoot = ({ plugin }: KanbanListUIProps) => {
 	const handleOpenBoard = useCallback(
 		(path: string) => {
 			const target = plugin.app.vault.getAbstractFileByPath(path);
-			if (!(target instanceof TFile)) {
-				new Notice('Kanban file not found.');
+			if (!isTFileLike(target)) {
+				notice('Kanban file not found.');
 				void scheduleReload();
 				return;
 			}
-			void plugin.kanbanManager.openBoard(target);
+			void runKanbanListAction('Failed to open kanban board', 'Failed to open kanban board.', () =>
+				plugin.kanbanManager.openBoard(target),
+			);
 		},
 		[plugin.app.vault, plugin.kanbanManager, scheduleReload],
 	);
@@ -50,7 +74,11 @@ const KanbanListRoot = ({ plugin }: KanbanListUIProps) => {
 						isRefreshing ? 'opacity-60' : ''
 					}`}
 					onClick={() => {
-						void reloadList(true);
+						void runKanbanListAction(
+							'Failed to refresh kanban boards',
+							'Failed to refresh kanban boards.',
+							() => reloadList(true),
+						);
 					}}
 				>
 					<span className="inline-flex items-center gap-1.5">

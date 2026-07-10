@@ -5,7 +5,7 @@ import {
 } from '../services/card-removal-service';
 import type { RemoveCardOptions } from '../types';
 import type { App } from 'obsidian';
-import { Menu, Modal, Notice, Setting } from 'obsidian';
+import { Menu, Modal, Setting } from 'obsidian';
 
 type ApprovalResult = (value: boolean) => void;
 type CardRemovalApprovalResult = (value: { approved: boolean; deleteLinkedNote: boolean }) => void;
@@ -114,7 +114,7 @@ class CardRemovalApprovalModal extends Modal {
 	}
 }
 
-export function requestCardRemovalApproval(
+function requestCardRemovalApproval(
 	app: App,
 	params: {
 		showDeleteLinkedNote: boolean;
@@ -145,7 +145,8 @@ type CardMenuCallbacks = {
 
 type ShowCardMenuParams = CardMenuCallbacks & {
 	app: App;
-	event: MouseEvent;
+	event: MouseEvent | KeyboardEvent;
+	anchorEl: HTMLElement;
 	sourcePath: string;
 	cardId: string;
 	title: string;
@@ -155,6 +156,7 @@ export function showCardMenu(params: ShowCardMenuParams): void {
 	const {
 		app,
 		event,
+		anchorEl,
 		sourcePath,
 		cardId,
 		title,
@@ -180,7 +182,6 @@ export function showCardMenu(params: ShowCardMenuParams): void {
 	menu.addItem((item) => {
 		item.setTitle('Copy link to card').onClick(() => {
 			onCopyCardLink(cardId);
-			new Notice('Card link copied to clipboard.');
 		});
 	});
 	menu.addItem((item) => {
@@ -202,5 +203,11 @@ export function showCardMenu(params: ShowCardMenuParams): void {
 			})();
 		});
 	});
-	menu.showAtMouseEvent(event);
+	const MouseEventConstructor = anchorEl.ownerDocument.defaultView?.MouseEvent;
+	if (MouseEventConstructor && event instanceof MouseEventConstructor) {
+		menu.showAtMouseEvent(event);
+		return;
+	}
+	const anchorRect = anchorEl.getBoundingClientRect();
+	menu.showAtPosition({ x: anchorRect.left, y: anchorRect.bottom }, anchorEl.ownerDocument);
 }

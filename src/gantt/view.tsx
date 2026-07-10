@@ -1,10 +1,11 @@
+import { createNotice } from '../shared/services/notice-service';
 import { GanttHeader } from './_components/GanttHeader';
 import { GanttStatePanel } from './_components/GanttStatePanel';
 import { GanttYearGrid } from './_components/GanttYearGrid';
 import { useGanttData } from './hooks/use-gantt-data';
 import type { GanttPluginContext } from './types';
 import { render } from 'preact';
-import { useState } from 'preact/hooks';
+import { useCallback, useMemo, useState } from 'preact/hooks';
 
 type GanttRootProps = {
 	plugin: GanttPluginContext;
@@ -12,6 +13,7 @@ type GanttRootProps = {
 
 const GanttRoot = ({ plugin }: GanttRootProps) => {
 	const [scrollToTodayRequestKey, setScrollToTodayRequestKey] = useState(0);
+	const notice = useMemo(createNotice, []);
 	const {
 		errorMessage,
 		isLoading,
@@ -26,6 +28,17 @@ const GanttRoot = ({ plugin }: GanttRootProps) => {
 		goToCurrentYear();
 		setScrollToTodayRequestKey((current) => current + 1);
 	};
+	const handleOpenBoard = useCallback(
+		async (boardPath: string) => {
+			try {
+				await plugin.openKanbanBoard(boardPath);
+			} catch (error) {
+				console.error('Failed to open kanban board from gantt', error);
+				notice('Failed to open kanban board.');
+			}
+		},
+		[notice, plugin],
+	);
 
 	return (
 		<div className="flex h-full w-full flex-col overflow-hidden bg-[var(--background-primary)]">
@@ -43,7 +56,7 @@ const GanttRoot = ({ plugin }: GanttRootProps) => {
 				<GanttStatePanel message={`No dated kanban events found for ${selectedYear}.`} />
 			) : (
 				<GanttYearGrid
-					onOpenBoard={(boardPath) => void plugin.openKanbanBoard(boardPath)}
+					onOpenBoard={handleOpenBoard}
 					scrollToTodayRequestKey={scrollToTodayRequestKey}
 					view={yearView}
 				/>

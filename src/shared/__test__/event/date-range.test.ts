@@ -33,6 +33,32 @@ void test('resolveNormalizedEventDateRange treats next-day 00:00 as exclusive fo
 	assert.deepEqual(range, { startKey: '2026-03-03', endKey: '2026-03-03' });
 });
 
+void test('resolveNormalizedEventDateRange infers next day for overnight timed events without endDate', () => {
+	const range = resolveNormalizedEventDateRange(
+		createEvent({
+			date: '2026-03-03',
+			startTime: '20:00',
+			endTime: '01:01',
+			allDay: false,
+			endDate: undefined,
+		}),
+	);
+	assert.deepEqual(range, { startKey: '2026-03-03', endKey: '2026-03-04' });
+});
+
+void test('resolveNormalizedEventDateRange treats inferred next-day midnight as exclusive', () => {
+	const range = resolveNormalizedEventDateRange(
+		createEvent({
+			date: '2026-03-03',
+			startTime: '20:00',
+			endTime: '00:00',
+			allDay: false,
+			endDate: undefined,
+		}),
+	);
+	assert.deepEqual(range, { startKey: '2026-03-03', endKey: '2026-03-03' });
+});
+
 void test('resolveNormalizedEventDateRange clamps end key when end is before start', () => {
 	const range = resolveNormalizedEventDateRange(
 		createEvent({

@@ -13,7 +13,7 @@ type AllDayCellData = {
 	inMonth: boolean;
 };
 
-export type AllDayEventGridProps = AllDayEventInteractionHandlers & {
+type AllDayEventGridProps = AllDayEventInteractionHandlers & {
 	cells: AllDayCellData[];
 	columnCount: number;
 	weekStartIndex: number;

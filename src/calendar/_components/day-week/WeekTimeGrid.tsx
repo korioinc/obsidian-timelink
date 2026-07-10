@@ -1,7 +1,10 @@
 import { canMoveEvent } from '../../../shared/event/event-sync';
 import { compareDateKey } from '../../../shared/event/model-utils';
 import { MINUTES_IN_DAY, toMinutes } from '../../../shared/event/model-utils';
-import { deriveTimedEventVisualState } from '../../../shared/event/timed-visual-model';
+import {
+	buildSingleColumnTimedDragAnchor,
+	deriveTimedEventVisualState,
+} from '../../../shared/event/timed-visual-model';
 import { TimeGridOverlayLayers } from '../../../shared/time-grid/TimeGridOverlayLayers';
 import { TimedEventCard } from '../../../shared/time-grid/TimedEventCard';
 import { TimedGridFrame } from '../../../shared/time-grid/TimedGridFrame';
@@ -175,7 +178,7 @@ export const WeekTimeGrid = ({
 				const endLabel = formatTime(visualState.labelEndMinutes);
 				return (
 					<TimedEventCard
-						key={`timed-${placement.segment.id}`}
+						key={`timed-${placement.segment.id}-${placementDateKey}`}
 						placement={placement}
 						visualTop={visualState.visualTop}
 						visualHeight={visualState.visualHeight}
@@ -191,6 +194,7 @@ export const WeekTimeGrid = ({
 						onTimedResizeStart={onTimedResizeStart}
 						onTimedEventDragStart={onTimedEventDragStart}
 						onTimedEventDragEnd={onTimedEventDragEnd}
+						dragAnchor={buildSingleColumnTimedDragAnchor(placementDateKey, placement)}
 					/>
 				);
 			})}

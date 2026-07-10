@@ -4,7 +4,6 @@ import {
 } from '../../shared/event/time-grid-interactions';
 import type { EditableEventResponse } from '../../shared/event/types';
 import {
-	buildDefaultResizeCommitEntries,
 	type UseTimedGridEventInteractionsResult,
 	useTimedGridEventInteractions,
 } from '../../shared/hooks/use-timed-grid-event-interactions';
@@ -50,6 +49,7 @@ export const useTimelineTimedInteractions = ({
 }: UseTimelineTimedInteractionsParams): UseTimelineTimedInteractionsResult =>
 	useTimedGridEventInteractions({
 		defaultEventColor,
+		resizeStepMinutes: TIMELINE_SLOT_MINUTES,
 		isResizingRef,
 		onSaveEvent,
 		onMoveEvent,
@@ -74,8 +74,6 @@ export const useTimelineTimedInteractions = ({
 		onDragStart: (event, segment) => {
 			event.dataTransfer?.setData('text/plain', segment.id);
 		},
-		buildResizeCommitEntries: (segment, hoverDateKey, hoverMinutes) =>
-			buildDefaultResizeCommitEntries(segment, hoverDateKey, hoverMinutes),
 		shouldCommitResize: (entries) => hasTimelineResizeChange(entries.next, entries.previous),
 		clearDragStateAfterDrop: true,
 	});

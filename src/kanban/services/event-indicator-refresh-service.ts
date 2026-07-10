@@ -1,25 +1,4 @@
-import type { KanbanBoard } from '../types';
-import { resolveLinkedCardFile } from './card-service';
-import type { App } from 'obsidian';
-
-export const buildLinkedCardPathSet = (
-	app: App,
-	board: KanbanBoard | null,
-	sourceFilePath: string | null,
-): Set<string> => {
-	const linkedPaths = new Set<string>();
-	if (!board || !sourceFilePath) return linkedPaths;
-
-	for (const lane of board.lanes) {
-		for (const card of lane.cards) {
-			const linkedCardFile = resolveLinkedCardFile(app, sourceFilePath, card.title);
-			if (!linkedCardFile) continue;
-			linkedPaths.add(linkedCardFile.path);
-		}
-	}
-
-	return linkedPaths;
-};
+import type { App, TAbstractFile, TFile } from 'obsidian';
 
 export const shouldRefreshCardEventIndicators = (
 	filePath: string | null | undefined,
@@ -36,26 +15,26 @@ export const registerKanbanCardEventIndicatorRefresh = (
 	getLinkedCardPaths: () => ReadonlySet<string>,
 	onReload: () => void,
 ): (() => void) => {
-	const onChanged = (file: { path: string }) => {
+	const onChanged = (file: TFile) => {
 		if (!shouldRefreshCardEventIndicators(file.path, undefined, getLinkedCardPaths())) return;
 		onReload();
 	};
-	const onDeleted = (file: { path: string }) => {
+	const onDeleted = (file: TFile) => {
 		if (!shouldRefreshCardEventIndicators(file.path, undefined, getLinkedCardPaths())) return;
 		onReload();
 	};
-	const onRename = (file: { path: string }, oldPath: string) => {
+	const onRename = (file: TAbstractFile, oldPath: string) => {
 		if (!shouldRefreshCardEventIndicators(file.path, oldPath, getLinkedCardPaths())) return;
 		onReload();
 	};
 
-	app.metadataCache.on('changed', onChanged);
-	app.metadataCache.on('deleted', onDeleted);
-	app.vault.on('rename', onRename);
+	const changedRef = app.metadataCache.on('changed', onChanged);
+	const deletedRef = app.metadataCache.on('deleted', onDeleted);
+	const renameRef = app.vault.on('rename', onRename);
 
 	return () => {
-		app.metadataCache.off('changed', onChanged);
-		app.metadataCache.off('deleted', onDeleted);
-		app.vault.off('rename', onRename);
+		app.metadataCache.offref(changedRef);
+		app.metadataCache.offref(deletedRef);
+		app.vault.offref(renameRef);
 	};
 };

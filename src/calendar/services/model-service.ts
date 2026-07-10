@@ -5,11 +5,20 @@ import type {
 	EditableEventResponse,
 	EventLocation,
 } from '../../shared/event/types';
+import { SerialTaskQueue } from '../../shared/utils/serial-task-queue';
 import {
 	clearLinkedCardEventBacklink,
+	createLinkedCardEventBacklinkSnapshot,
+	restoreLinkedCardEventBacklink,
 	syncLinkedCardEventBacklink,
 	trashLinkedCardNoteIfBodyEmpty,
 } from './event-card-backlink-service';
+import {
+	applyEventFrontmatterWithSnapshot,
+	createEventFrontmatterSnapshot,
+	restoreEventFrontmatterSnapshot,
+} from './event-frontmatter-transaction';
+import { runEventModificationTransaction } from './event-modification-transaction';
 import { TFile, TFolder, normalizePath, type App } from 'obsidian';
 
 type PrintableAtom = Array<number | string> | number | string | boolean;
@@ -50,6 +59,10 @@ const buildEventFrontmatter = (event: CalendarEvent): Partial<CalendarEvent> => 
 export class FullNoteCalendar {
 	private plugin: CalendarPluginContext;
 	private directory: string;
+	private readonly directoryChangeListeners = new Set<() => void>();
+	private readonly modificationQueue = new SerialTaskQueue();
+	private readonly activeModificationFilesByPath = new Map<string, TFile>();
+	private readonly pendingModificationCounts = new Map<TFile, number>();
 
 	constructor(plugin: CalendarPluginContext, directory: string) {
 		this.plugin = plugin;
@@ -58,6 +71,18 @@ export class FullNoteCalendar {
 
 	getDirectory(): string {
 		return this.directory;
+	}
+
+	setDirectory(directory: string): void {
+		const nextDirectory = normalizePath(directory);
+		if (nextDirectory === this.directory) return;
+		this.directory = nextDirectory;
+		this.directoryChangeListeners.forEach((listener) => listener());
+	}
+
+	onDirectoryChange(listener: () => void): () => void {
+		this.directoryChangeListeners.add(listener);
+		return () => this.directoryChangeListeners.delete(listener);
 	}
 
 	getEventsInFile(file: TFile): EditableEventResponse[] {
@@ -135,11 +160,15 @@ export class FullNoteCalendar {
 		return { file, lineNumber: undefined };
 	}
 
-	private resolveEventFileOrThrow(location: EventLocation): TFile {
-		const { file, lineNumber } = location;
-		if (lineNumber !== undefined) {
+	private assertNoteEventLocation(location: EventLocation): void {
+		if (location.lineNumber !== undefined) {
 			throw new Error('Note calendar cannot handle inline events.');
 		}
+	}
+
+	private resolveEventFileOrThrow(location: EventLocation): TFile {
+		this.assertNoteEventLocation(location);
+		const { file } = location;
 		const target = this.plugin.app.vault.getAbstractFileByPath(file.path);
 		if (!target || !(target instanceof TFile)) {
 			throw new Error(`File ${file.path} not found.`);
@@ -147,8 +176,35 @@ export class FullNoteCalendar {
 		return target;
 	}
 
-	async deleteEvent(_location: EventLocation, options?: DeleteEventOptions): Promise<void> {
-		const target = this.resolveEventFileOrThrow(_location);
+	private resolveActiveEventFileOrThrow(location: EventLocation): TFile {
+		this.assertNoteEventLocation(location);
+		return (
+			this.activeModificationFilesByPath.get(location.file.path) ??
+			this.resolveEventFileOrThrow(location)
+		);
+	}
+
+	async deleteEvent(
+		_location: EventLocation,
+		options?: DeleteEventOptions,
+	): Promise<EventLocation> {
+		const target = this.resolveActiveEventFileOrThrow(_location);
+		this.retainModificationTarget(target, _location.file.path);
+		try {
+			return await this.modificationQueue.run(() => this.deleteResolvedEvent(target, options));
+		} finally {
+			this.releaseModificationTarget(target);
+		}
+	}
+
+	private async deleteResolvedEvent(
+		target: TFile,
+		options?: DeleteEventOptions,
+	): Promise<EventLocation> {
+		const deletedLocation: EventLocation = {
+			file: { path: target.path },
+			lineNumber: undefined,
+		};
 		const cachedFrontmatter = this.plugin.app.metadataCache.getFileCache(target)?.frontmatter;
 		if (options?.deleteLinkedNote) {
 			await trashLinkedCardNoteIfBodyEmpty(this.plugin.app, target.path, cachedFrontmatter);
@@ -157,6 +213,7 @@ export class FullNoteCalendar {
 		}
 
 		await this.plugin.app.fileManager.trashFile(target);
+		return deletedLocation;
 	}
 
 	async modifyEvent(
@@ -164,44 +221,106 @@ export class FullNoteCalendar {
 		_newEvent: CalendarEvent,
 		_updateCacheWithLocation: (loc: EventLocation) => void,
 	): Promise<void> {
-		const target = this.resolveEventFileOrThrow(_location);
+		const target = this.resolveActiveEventFileOrThrow(_location);
+		this.retainModificationTarget(target, _location.file.path);
+		try {
+			await this.modificationQueue.run(() =>
+				this.modifyResolvedEvent(target, _newEvent, _updateCacheWithLocation),
+			);
+		} finally {
+			this.releaseModificationTarget(target);
+		}
+	}
+
+	private retainModificationTarget(target: TFile, requestedPath: string): void {
+		this.pendingModificationCounts.set(
+			target,
+			(this.pendingModificationCounts.get(target) ?? 0) + 1,
+		);
+		this.activeModificationFilesByPath.set(requestedPath, target);
+		this.activeModificationFilesByPath.set(target.path, target);
+	}
+
+	private releaseModificationTarget(target: TFile): void {
+		const nextCount = (this.pendingModificationCounts.get(target) ?? 1) - 1;
+		if (nextCount > 0) {
+			this.pendingModificationCounts.set(target, nextCount);
+			return;
+		}
+		this.pendingModificationCounts.delete(target);
+		for (const [path, activeTarget] of this.activeModificationFilesByPath) {
+			if (activeTarget === target) this.activeModificationFilesByPath.delete(path);
+		}
+	}
+
+	private async modifyResolvedEvent(
+		target: TFile,
+		newEvent: CalendarEvent,
+		updateCacheWithLocation: (loc: EventLocation) => void,
+	): Promise<void> {
 		const sourcePath = target.path;
+		this.activeModificationFilesByPath.set(sourcePath, target);
 		const cachedFrontmatter = this.plugin.app.metadataCache.getFileCache(target)?.frontmatter;
 		const existingCreator =
 			typeof cachedFrontmatter?.creator === 'string' ? cachedFrontmatter.creator : undefined;
 
 		const parentPath = target.parent?.path ?? this.directory;
-		const newPath = `${parentPath}/${buildEventFilename(_newEvent)}`;
+		const newPath = `${parentPath}/${buildEventFilename(newEvent)}`;
 		const newLocation: EventLocation = {
 			file: { path: newPath },
 			lineNumber: undefined,
 		};
-		_updateCacheWithLocation(newLocation);
-		if (target.path !== newPath) {
-			await this.plugin.app.vault.rename(target, newPath);
-		}
 		const eventFrontmatter = buildEventFrontmatter({
-			..._newEvent,
-			creator: (existingCreator as CalendarEvent['creator']) ?? _newEvent.creator,
+			...newEvent,
+			creator: (existingCreator as CalendarEvent['creator']) ?? newEvent.creator,
 		});
-		await this.plugin.app.fileManager.processFrontMatter(
+		const backlinkSnapshot = createLinkedCardEventBacklinkSnapshot();
+		const eventFrontmatterSnapshot = createEventFrontmatterSnapshot();
+		await runEventModificationTransaction({
 			target,
-			(frontmatter: Record<string, unknown>) => {
-				Object.entries(eventFrontmatter).forEach(([key, value]) => {
-					if (value === undefined) {
-						delete frontmatter[key];
-					} else {
-						frontmatter[key] = value;
-					}
-				});
-			},
-		);
-		await syncLinkedCardEventBacklink({
-			app: this.plugin.app,
-			eventFile: target,
 			sourcePath,
-			eventTitle: _newEvent.title,
-			frontmatter: cachedFrontmatter,
+			nextPath: newPath,
+			rename: (path) => this.plugin.app.vault.rename(target, path),
+			writeFrontmatter: () =>
+				this.plugin.app.fileManager.processFrontMatter(
+					target,
+					(frontmatter: Record<string, unknown>) =>
+						applyEventFrontmatterWithSnapshot(
+							frontmatter,
+							eventFrontmatter,
+							eventFrontmatterSnapshot,
+						),
+				),
+			syncBacklink: () =>
+				syncLinkedCardEventBacklink({
+					app: this.plugin.app,
+					eventFile: target,
+					sourcePath,
+					eventTitle: newEvent.title,
+					frontmatter: cachedFrontmatter,
+					rollbackSnapshot: backlinkSnapshot,
+				}),
+			restoreBacklink: () => restoreLinkedCardEventBacklink(this.plugin.app, backlinkSnapshot),
+			restoreEvent: async () => {
+				let fullyRestored = true;
+				await this.plugin.app.fileManager.processFrontMatter(
+					target,
+					(frontmatter: Record<string, unknown>) => {
+						fullyRestored = restoreEventFrontmatterSnapshot(frontmatter, eventFrontmatterSnapshot);
+					},
+				);
+				if (!fullyRestored) {
+					throw new Error('Event frontmatter changed while the modification was rolling back.');
+				}
+			},
+			onCommitted: () => {
+				this.activeModificationFilesByPath.set(newPath, target);
+				updateCacheWithLocation(newLocation);
+			},
+			onRollbackFailed: (currentPath) => {
+				this.activeModificationFilesByPath.set(currentPath, target);
+				updateCacheWithLocation({ file: { path: currentPath }, lineNumber: undefined });
+			},
 		});
 	}
 }

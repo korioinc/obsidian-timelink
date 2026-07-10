@@ -1,3 +1,5 @@
+import { toMinutes } from '../../shared/event/model-utils';
+import { MinHeap } from '../../shared/utils/min-heap';
 import type {
 	EventSegment,
 	WeekDayKey,
@@ -18,16 +20,6 @@ const EMPTY_HIDDEN_COUNTS: Record<WeekDayKey, number> = {
 	4: 0,
 	5: 0,
 	6: 0,
-};
-
-const parseTimeMinutes = (value?: string | null): number | null => {
-	if (!value) return null;
-	const parts = value.split(':');
-	if (parts.length < 2 || parts[0] === undefined || parts[1] === undefined) return null;
-	const hours = Number(parts[0]);
-	const minutes = Number(parts[1]);
-	if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
-	return hours * 60 + minutes;
 };
 
 export const getWeekBounds = (weekIndex: number) => {
@@ -91,8 +83,8 @@ const compareStackItems = (
 		return b.segment.span - a.segment.span;
 	}
 	return compareEventTimeMinutesThenTitle(
-		parseTimeMinutes(a.segment.event.startTime),
-		parseTimeMinutes(b.segment.event.startTime),
+		toMinutes(a.segment.event.startTime),
+		toMinutes(b.segment.event.startTime),
 		a.segment.event.title,
 		b.segment.event.title,
 	);
@@ -148,11 +140,10 @@ const compareWeekLayoutItems = (a: WeekLayoutItem, b: WeekLayoutItem) =>
 		},
 	);
 
-const willCollide = (
-	row: Array<{ start: number; end: number }> | undefined,
-	start: number,
-	end: number,
-) => (row ? row.some((range) => !(end < range.start || start > range.end)) : false);
+type ActiveWeekRow = {
+	endIndex: number;
+	rowIndex: number;
+};
 
 export const getWeekEventLayout = (
 	eventRows: EventSegment[][],
@@ -201,30 +192,26 @@ export const getWeekEventLayout = (
 
 	items.sort(compareWeekLayoutItems);
 
-	const occupancy: Array<Array<{ start: number; end: number }>> = [];
-	let maxRowIndexUsed = -1;
+	const activeRows = new MinHeap<ActiveWeekRow>(
+		(left, right) => left.endIndex - right.endIndex || left.rowIndex - right.rowIndex,
+	);
+	const availableRows = new MinHeap<number>((left, right) => left - right);
+	let weekRowCount = 0;
 	const placements: Array<
 		(WeekMultiDayPlacement | WeekSingleDayPlacement) & { spanType: 'multi' | 'single' }
 	> = [];
 
-	const findRowForItem = (start: number, end: number) => {
-		for (let rowIndex = 0; rowIndex < occupancy.length; rowIndex += 1) {
-			if (!willCollide(occupancy[rowIndex], start, end)) {
-				return rowIndex;
-			}
-		}
-		return occupancy.length;
-	};
-
 	for (const item of items) {
-		const rowIndex = findRowForItem(item.clampedStart, item.clampedEnd);
-		if (rowIndex > maxRowIndexUsed) {
-			maxRowIndexUsed = rowIndex;
+		while ((activeRows.peek()?.endIndex ?? Number.POSITIVE_INFINITY) < item.clampedStart) {
+			const expired = activeRows.pop();
+			if (expired) availableRows.push(expired.rowIndex);
 		}
-		if (!occupancy[rowIndex]) {
-			occupancy[rowIndex] = [];
+		let rowIndex = availableRows.pop();
+		if (rowIndex === undefined) {
+			rowIndex = weekRowCount;
+			weekRowCount += 1;
 		}
-		occupancy[rowIndex]?.push({ start: item.clampedStart, end: item.clampedEnd });
+		activeRows.push({ endIndex: item.clampedEnd, rowIndex });
 		if (rowIndex >= rowCapacity) {
 			incrementHiddenCountsForSpan(
 				hiddenCountsByDay,
@@ -267,7 +254,6 @@ export const getWeekEventLayout = (
 		(placement): placement is WeekSingleDayPlacement & { spanType: 'single' } =>
 			placement.spanType === 'single',
 	);
-	const weekRowCount = Math.max(occupancy.length, maxRowIndexUsed + 1);
 
 	return {
 		rowCapacity,

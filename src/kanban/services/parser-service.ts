@@ -20,9 +20,8 @@ export function parseKanbanBoard(markdown: string): KanbanBoard {
 	const lanes: KanbanLane[] = [];
 	let currentLane: KanbanLane | null = null;
 
-	const pushLane = (endIndex: number) => {
+	const pushLane = () => {
 		if (!currentLane) return;
-		currentLane.lineEnd = endIndex;
 		lanes.push(currentLane);
 	};
 
@@ -31,14 +30,12 @@ export function parseKanbanBoard(markdown: string): KanbanBoard {
 		const headingMatch = line.match(headingPattern);
 		if (headingMatch?.[1] !== undefined) {
 			if (currentLane) {
-				pushLane(index);
+				pushLane();
 			}
 
 			currentLane = {
 				id: `lane-${lanes.length}`,
 				title: headingMatch[1].trim(),
-				lineStart: index,
-				lineEnd: index,
 				cards: [],
 			};
 			continue;
@@ -76,13 +73,12 @@ export function parseKanbanBoard(markdown: string): KanbanBoard {
 			currentLane.cards.push({
 				id: `card-${currentLane.cards.length}-${index}`,
 				title: cardTitle,
-				lineStart: index,
 				blockId: blockId || undefined,
 			});
 		}
 	}
 
-	pushLane(lines.length);
+	pushLane();
 
 	return { lanes, settings: parseBoardSettingsFooter(markdown) };
 }
@@ -109,37 +105,141 @@ function ensureBlankLine(output: string[]): void {
 	if (output[output.length - 1] !== '') output.push('');
 }
 
+function trimBlankEdges(lines: string[]): string[] {
+	let start = 0;
+	let end = lines.length;
+	while (start < end && lines[start]?.trim() === '') start += 1;
+	while (end > start && lines[end - 1]?.trim() === '') end -= 1;
+	return lines.slice(start, end);
+}
+
+function splitPreservedMarkdownBody(
+	lines: string[],
+	bodyStartIndex: number,
+): {
+	beforeBoard: string[];
+	afterBoard: string[];
+	afterLaneById: Map<string, string[]>;
+} {
+	const ownedLineIndexes = new Set<number>();
+	const laneIdByLineIndex = new Map<number, string>();
+	let firstBoardLineIndex = -1;
+	let lastBoardLineIndex = -1;
+	let currentLaneId: string | null = null;
+	let laneIndex = 0;
+
+	for (let index = bodyStartIndex; index < lines.length; index += 1) {
+		const line = lines[index] ?? '';
+		if (headingPattern.test(line)) {
+			currentLaneId = `lane-${laneIndex}`;
+			laneIndex += 1;
+			if (firstBoardLineIndex === -1) firstBoardLineIndex = index;
+			lastBoardLineIndex = index;
+			ownedLineIndexes.add(index);
+			laneIdByLineIndex.set(index, currentLaneId);
+			continue;
+		}
+		if (!currentLaneId) continue;
+		laneIdByLineIndex.set(index, currentLaneId);
+		if (!cardPattern.test(line)) continue;
+
+		ownedLineIndexes.add(index);
+		lastBoardLineIndex = index;
+		let cursor = index + 1;
+		while (cursor < lines.length) {
+			const continuation = lines[cursor] ?? '';
+			if (continuation !== '' && !continuation.startsWith('  ') && !continuation.startsWith('\t')) {
+				break;
+			}
+			ownedLineIndexes.add(cursor);
+			laneIdByLineIndex.set(cursor, currentLaneId);
+			lastBoardLineIndex = cursor;
+			cursor += 1;
+		}
+		index = cursor - 1;
+	}
+
+	if (firstBoardLineIndex === -1) {
+		return {
+			beforeBoard: trimBlankEdges(lines.slice(bodyStartIndex)),
+			afterBoard: [],
+			afterLaneById: new Map(),
+		};
+	}
+
+	const afterLaneById = new Map<string, string[]>();
+	for (let index = firstBoardLineIndex; index <= lastBoardLineIndex; index += 1) {
+		if (ownedLineIndexes.has(index)) continue;
+		const laneId = laneIdByLineIndex.get(index);
+		if (!laneId) continue;
+		const preservedLines = afterLaneById.get(laneId) ?? [];
+		preservedLines.push(lines[index] ?? '');
+		afterLaneById.set(laneId, preservedLines);
+	}
+	for (const [laneId, preservedLines] of afterLaneById) {
+		const trimmedLines = trimBlankEdges(preservedLines);
+		if (trimmedLines.length === 0) {
+			afterLaneById.delete(laneId);
+		} else {
+			afterLaneById.set(laneId, trimmedLines);
+		}
+	}
+
+	return {
+		beforeBoard: trimBlankEdges(lines.slice(bodyStartIndex, firstBoardLineIndex)),
+		afterBoard: trimBlankEdges(lines.slice(lastBoardLineIndex + 1)),
+		afterLaneById,
+	};
+}
+
+function appendSection(output: string[], lines: string[]): void {
+	if (lines.length === 0) return;
+	ensureBlankLine(output);
+	output.push(...lines);
+}
+
 export function serializeKanbanBoard(board: KanbanBoard, original: string): string {
 	const lines = stripSettingsFooterFromLines(original.split('\n'));
 	const output: string[] = [];
+	const boardLines: string[] = [];
 	const frontmatterEnd = getFrontmatterEndIndex(lines);
 	let lineIndex = frontmatterEnd !== -1 ? frontmatterEnd + 1 : 0;
+	const preservedBody = splitPreservedMarkdownBody(lines, lineIndex);
 
 	for (let i = 0; i < lineIndex; i += 1) {
 		const line = lines[i];
 		if (line !== undefined) output.push(line);
 	}
 
-	if (lineIndex > 0) {
-		ensureBlankLine(output);
-	}
-
+	const consumedPreservedLaneIds = new Set<string>();
 	board.lanes.forEach((lane, laneIndex) => {
-		if (laneIndex > 0) output.push('');
-		output.push(`## ${lane.title}`);
-		output.push('');
+		if (laneIndex > 0) boardLines.push('');
+		boardLines.push(`## ${lane.title}`);
+		boardLines.push('');
 
 		lane.cards.forEach((card) => {
 			const suffix = card.blockId ? ` ^${card.blockId}` : '';
 			const normalized = stripCheckboxPrefix(card.title).replace(/\r\n/g, '\n');
 			const lines = normalized.split('\n');
 			const firstLine = lines.shift() ?? '';
-			output.push(`- [ ] ${firstLine}${suffix}`);
+			boardLines.push(`- [ ] ${firstLine}${suffix}`);
 			lines.forEach((line) => {
-				output.push(`  ${line}`);
+				boardLines.push(`  ${line}`);
 			});
 		});
+
+		const preservedLaneLines = preservedBody.afterLaneById.get(lane.id) ?? [];
+		appendSection(boardLines, preservedLaneLines);
+		consumedPreservedLaneIds.add(lane.id);
 	});
+	for (const [laneId, preservedLaneLines] of preservedBody.afterLaneById) {
+		if (consumedPreservedLaneIds.has(laneId)) continue;
+		appendSection(boardLines, preservedLaneLines);
+	}
+
+	appendSection(output, preservedBody.beforeBoard);
+	appendSection(output, boardLines);
+	appendSection(output, preservedBody.afterBoard);
 
 	const settingsFooter = serializeBoardSettingsFooter(board.settings);
 	if (settingsFooter) {

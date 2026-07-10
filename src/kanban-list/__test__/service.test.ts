@@ -26,6 +26,7 @@ void test('collectKanbanBoards filters by depth, resolves colors, and sorts dete
 		createFile('board-cached.md', 200),
 		createFile('folder/fallback.md', 150),
 		createFile('folder/normal.md', 300),
+		createFile('folder/not-a-board.md', 250),
 		createFile('alpha.md', 100),
 		createFile('zeta.md', 100),
 		createFile('deep/nested/board.md', 400),
@@ -42,6 +43,11 @@ void test('collectKanbanBoards filters by depth, resolves colors, and sorts dete
 		'folder/normal.md': {
 			frontmatter: {
 				title: 'normal note',
+			},
+		},
+		'folder/not-a-board.md': {
+			frontmatter: {
+				'kanban-plugin': 'legacy',
 			},
 		},
 		'alpha.md': {
@@ -70,6 +76,7 @@ void test('collectKanbanBoards filters by depth, resolves colors, and sorts dete
 			'# fallback',
 		].join('\n'),
 	};
+	let cacheLookupCount = 0;
 
 	const app = {
 		vault: {
@@ -77,11 +84,14 @@ void test('collectKanbanBoards filters by depth, resolves colors, and sorts dete
 			cachedRead: (file: MockFile) => Promise.resolve(markdownByPath[file.path] ?? ''),
 		},
 		metadataCache: {
-			getFileCache: (file: MockFile) => cacheByPath[file.path],
+			getFileCache: (file: MockFile) => {
+				cacheLookupCount += 1;
+				return cacheByPath[file.path] ?? null;
+			},
 		},
 	};
 
-	const items = await collectKanbanBoards(app as never, 1);
+	const items = await collectKanbanBoards(app, 1);
 	assert.strictEqual(items.length, 4);
 	assert.deepEqual(
 		items.map((item) => item.path),
@@ -91,4 +101,5 @@ void test('collectKanbanBoards filters by depth, resolves colors, and sorts dete
 	assert.strictEqual(items[1]?.kanbanColor, '#AABBCC');
 	assert.strictEqual(items[2]?.kanbanColor, undefined);
 	assert.strictEqual(items[3]?.kanbanColor, undefined);
+	assert.strictEqual(cacheLookupCount, 6);
 });

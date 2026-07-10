@@ -116,6 +116,38 @@ void test('normalizeTimeSelection normalizes backward date selection', () => {
 	assert.strictEqual(range.endMinutes, 10 * 60);
 });
 
+void test('normalizeTimeSelection normalizes backward time selection on the same date', () => {
+	const range = normalizeTimeSelection({
+		isSelecting: true,
+		anchorDateKey: '2026-03-01',
+		anchorMinutes: 10 * 60,
+		hoverDateKey: '2026-03-01',
+		hoverMinutes: 9 * 60,
+	});
+
+	assert.ok(range);
+	assert.strictEqual(range.startDateKey, '2026-03-01');
+	assert.strictEqual(range.endDateKey, '2026-03-01');
+	assert.strictEqual(range.startMinutes, 9 * 60);
+	assert.strictEqual(range.endMinutes, 10 * 60);
+});
+
+void test('normalizeTimeSelection preserves the end clock time across dates', () => {
+	const range = normalizeTimeSelection({
+		isSelecting: true,
+		anchorDateKey: '2026-03-01',
+		anchorMinutes: 23 * 60,
+		hoverDateKey: '2026-03-02',
+		hoverMinutes: 60,
+	});
+
+	assert.ok(range);
+	assert.strictEqual(range.startDateKey, '2026-03-01');
+	assert.strictEqual(range.endDateKey, '2026-03-02');
+	assert.strictEqual(range.startMinutes, 23 * 60);
+	assert.strictEqual(range.endMinutes, 60);
+});
+
 void test('normalizeTimeSelection returns null when anchor or hover is incomplete', () => {
 	assert.strictEqual(
 		normalizeTimeSelection({

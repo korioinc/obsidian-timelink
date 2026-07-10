@@ -69,7 +69,7 @@ const mountTimelineUI = (
 	containerEl: HTMLElement,
 	app: App,
 	calendar: TimelineUIProps['calendar'],
-	onOpenNote: (path: string) => void,
+	onOpenNote: (path: string) => Promise<void> | void,
 ): void => {
 	render(<TimelineRoot app={app} calendar={calendar} onOpenNote={onOpenNote} />, containerEl);
 };
@@ -103,7 +103,7 @@ export class TimeLinkTimelineView extends DatedEventItemView<TimelineUIProps['ca
 		containerEl: HTMLElement,
 		app: App,
 		calendar: TimelineUIProps['calendar'],
-		onOpenNote: (path: string) => void,
+		onOpenNote: (path: string) => Promise<void> | void,
 	): void {
 		mountTimelineUI(containerEl, app, calendar, onOpenNote);
 	}

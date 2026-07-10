@@ -37,7 +37,7 @@ const boardMarkdown = [
 	'- [ ] [[cards/beta-card]]',
 ].join('\n');
 
-const createMockApp = () => {
+const createMockApp = (onLinkLookup?: (linkPath: string) => void) => {
 	const files = {
 		'boards/alpha.md': createFile('boards/alpha.md', 500),
 		'cards/alpha-card.md': createFile('cards/alpha-card.md'),
@@ -89,6 +89,7 @@ const createMockApp = () => {
 		metadataCache: {
 			getFileCache: (file: MockFile) => ({ frontmatter: frontmatterByPath[file.path] }),
 			getFirstLinkpathDest: (linkPath: string) => {
+				onLinkLookup?.(linkPath);
 				const normalized = linkPath.replace(/^\//, '');
 				return (
 					files[normalized as keyof typeof files] ??
@@ -107,13 +108,21 @@ void test('collectGanttBoardSchedules groups linked dated events by kanban board
 
 	const boards = await collectGanttBoardSchedules({
 		app,
-		calendarFolderPath: 'calendar',
+		calendarFolderPath: 'calendar/',
 		maxDepth: 5,
 	});
 
 	assert.strictEqual(boards.length, 1);
 	assert.strictEqual(boards[0]?.path, 'boards/alpha.md');
 	assert.strictEqual(boards[0]?.rows.length, 2);
+	assert.deepEqual(boards[0]?.dependencyPaths, [
+		'boards/alpha.md',
+		'calendar/alpha-event.md',
+		'calendar/beta-event.md',
+		'cards/alpha-card.md',
+		'cards/beta-card.md',
+		'cards/no-date-card.md',
+	]);
 	assert.deepEqual(
 		boards[0]?.rows.map((row) => ({
 			title: row.title,
@@ -138,25 +147,33 @@ void test('collectGanttBoardSchedules groups linked dated events by kanban board
 	);
 });
 
+void test('collectGanttBoardSchedules resolves each linked card once per collection', async () => {
+	const linkLookups: string[] = [];
+	const app = createMockApp((linkPath) => linkLookups.push(linkPath));
+
+	await collectGanttBoardSchedules({
+		app,
+		calendarFolderPath: 'calendar',
+		maxDepth: 5,
+	});
+
+	const cardLookups = linkLookups.filter((path) => path.startsWith('cards/'));
+	assert.deepEqual(cardLookups, ['cards/alpha-card', 'cards/no-date-card', 'cards/beta-card']);
+	assert.strictEqual(linkLookups.length, 6);
+});
+
 void test('buildGanttYearView clamps event ranges to selected year, drops empty boards, and exposes today index', () => {
 	const yearView = buildGanttYearView(
 		[
 			{
 				path: 'boards/alpha.md',
 				basename: 'alpha',
-				folderPath: 'boards',
-				folderDepth: 1,
-				mtime: 500,
 				kanbanColor: '#224466',
-				linkedCardPaths: [],
-				linkedEventPaths: [],
 				dependencyPaths: [],
 				rows: [
 					{
 						id: 'beta',
 						title: 'Beta carryover',
-						boardPath: 'boards/alpha.md',
-						sourceEventPath: 'calendar/beta-event.md',
 						startKey: '2025-12-28',
 						endKey: '2026-01-03',
 						color: '#224466',
@@ -164,8 +181,6 @@ void test('buildGanttYearView clamps event ranges to selected year, drops empty 
 					{
 						id: 'alpha',
 						title: 'Alpha launch',
-						boardPath: 'boards/alpha.md',
-						sourceEventPath: 'calendar/alpha-event.md',
 						startKey: '2026-01-15',
 						endKey: '2026-02-10',
 						color: '#AA5500',
@@ -175,19 +190,12 @@ void test('buildGanttYearView clamps event ranges to selected year, drops empty 
 			{
 				path: 'boards/empty.md',
 				basename: 'empty',
-				folderPath: 'boards',
-				folderDepth: 1,
-				mtime: 100,
 				kanbanColor: '#999999',
-				linkedCardPaths: [],
-				linkedEventPaths: [],
 				dependencyPaths: [],
 				rows: [
 					{
 						id: 'outside',
 						title: 'Outside only',
-						boardPath: 'boards/empty.md',
-						sourceEventPath: 'calendar/outside.md',
 						startKey: '2027-01-10',
 						endKey: '2027-01-20',
 						color: '#999999',
@@ -208,7 +216,6 @@ void test('buildGanttYearView clamps event ranges to selected year, drops empty 
 		['1', '2', '3', '4', '5'],
 	);
 	assert.strictEqual(yearView.dayCells[31]?.label, '1');
-	assert.strictEqual(yearView.boardGroups.length, 1);
 	assert.strictEqual(yearView.rows.length, 2);
 	assert.strictEqual(yearView.rows[0]?.boardLabel?.basename, 'alpha');
 	assert.strictEqual(yearView.rows[1]?.boardLabel, null);
@@ -217,23 +224,17 @@ void test('buildGanttYearView clamps event ranges to selected year, drops empty 
 			title: row.title,
 			startDayIndex: row.startDayIndex,
 			spanDays: row.spanDays,
-			startKey: row.startKey,
-			endKey: row.endKey,
 		})),
 		[
 			{
 				title: 'Beta carryover',
 				startDayIndex: 0,
 				spanDays: 3,
-				startKey: '2026-01-01',
-				endKey: '2026-01-03',
 			},
 			{
 				title: 'Alpha launch',
 				startDayIndex: 14,
 				spanDays: 27,
-				startKey: '2026-01-15',
-				endKey: '2026-02-10',
 			},
 		],
 	);
@@ -249,19 +250,12 @@ void test('buildGanttYearView uses leap-year day counts', () => {
 			{
 				path: 'boards/alpha.md',
 				basename: 'alpha',
-				folderPath: 'boards',
-				folderDepth: 1,
-				mtime: 500,
 				kanbanColor: '#224466',
-				linkedCardPaths: [],
-				linkedEventPaths: [],
 				dependencyPaths: [],
 				rows: [
 					{
 						id: 'leap',
 						title: 'Leap window',
-						boardPath: 'boards/alpha.md',
-						sourceEventPath: 'calendar/leap.md',
 						startKey: '2028-02-28',
 						endKey: '2028-03-01',
 						color: '#224466',

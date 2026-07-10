@@ -21,7 +21,7 @@ type CardRemovalApp = FrontmatterMetadataApp & {
 };
 
 type CardRemovalCalendar = {
-	deleteEvent: (location: EventLocation) => Promise<void>;
+	deleteEvent: (location: EventLocation) => Promise<unknown>;
 };
 
 type CardRemovalDeps = {
@@ -36,7 +36,7 @@ type CardRemovalDeps = {
 	notice: (message: string) => void;
 };
 
-export type CardRemovalTargets = {
+type CardRemovalTargets = {
 	linkedCardFile: CardFileLike | null;
 	linkedEventFile: CardFileLike | null;
 };
@@ -91,11 +91,10 @@ function buildEventLocation(file: CardFileLike): EventLocation {
 }
 
 async function removeCardOnly(
-	board: KanbanBoard,
 	cardId: string,
 	applyBoardMutation: (mutate: (board: KanbanBoard) => KanbanBoard) => Promise<boolean>,
-): Promise<void> {
-	await applyBoardMutation((nextBoard) => removeCard(nextBoard, cardId));
+): Promise<boolean> {
+	return applyBoardMutation((nextBoard) => removeCard(nextBoard, cardId));
 }
 
 export async function removeCardWithLinkedCleanup({
@@ -111,34 +110,61 @@ export async function removeCardWithLinkedCleanup({
 }: CardRemovalDeps): Promise<void> {
 	if (!board) return;
 	if (!options?.deleteLinkedNote) {
-		await removeCardOnly(board, cardId, applyBoardMutation);
+		await removeCardOnly(cardId, applyBoardMutation);
 		return;
 	}
 
 	const card = findCardById(board, cardId);
 	if (!card) return;
 	if (!sourceFile) {
-		await removeCardOnly(board, cardId, applyBoardMutation);
+		await removeCardOnly(cardId, applyBoardMutation);
 		return;
 	}
 
 	const targets = resolveCardRemovalTargets(app, sourceFile.path, card.title, cardEventProperty);
 	if (!targets.linkedCardFile) {
-		await removeCardOnly(board, cardId, applyBoardMutation);
+		await removeCardOnly(cardId, applyBoardMutation);
 		return;
 	}
 
+	let noteCalendar: CardRemovalCalendar | null = null;
 	if (targets.linkedEventFile) {
-		const noteCalendar = calendar?.getCalendar();
+		noteCalendar = calendar?.getCalendar() ?? null;
 		if (!noteCalendar) {
 			notice('Calendar is not ready. Card was not removed.');
 			return;
 		}
+	}
+
+	let cardRemoved: boolean;
+	try {
+		cardRemoved = await removeCardOnly(cardId, applyBoardMutation);
+	} catch (error) {
+		console.error('Failed to remove card before linked cleanup', error);
+		notice(
+			targets.linkedEventFile
+				? 'Could not confirm card removal. Linked note and event were not deleted.'
+				: 'Could not confirm card removal. Linked note was not deleted.',
+		);
+		return;
+	}
+	if (!cardRemoved) {
+		notice(
+			targets.linkedEventFile
+				? 'Failed to remove the card. Linked note and event were not deleted.'
+				: 'Failed to remove the card. Linked note was not deleted.',
+		);
+		return;
+	}
+
+	if (targets.linkedEventFile && noteCalendar) {
 		try {
 			await noteCalendar.deleteEvent(buildEventLocation(targets.linkedEventFile));
 		} catch (error) {
 			console.error('Failed to delete linked event', error);
-			notice('Failed to delete the linked event. Card was not removed.');
+			notice(
+				'Card removed, but failed to delete the linked event. The linked note was not deleted.',
+			);
 			return;
 		}
 	}
@@ -147,9 +173,11 @@ export async function removeCardWithLinkedCleanup({
 		await app.fileManager.trashFile(targets.linkedCardFile);
 	} catch (error) {
 		console.error('Failed to delete linked note', error);
-		notice('Failed to delete the linked note. Card was not removed.');
+		notice(
+			targets.linkedEventFile
+				? 'Card and linked event were removed, but failed to delete the linked note.'
+				: 'Card removed, but failed to delete the linked note.',
+		);
 		return;
 	}
-
-	await removeCardOnly(board, cardId, applyBoardMutation);
 }

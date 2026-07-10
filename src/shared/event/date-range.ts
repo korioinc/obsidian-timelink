@@ -4,6 +4,7 @@ import {
 	diffInDays,
 	formatDateKey,
 	parseDateKey,
+	resolveEffectiveTimedEventRange,
 	toMinutes,
 } from './model-utils';
 import type { CalendarEvent } from './types';
@@ -14,15 +15,16 @@ type DateRange = {
 };
 
 export const resolveNormalizedEventDateRange = (
-	event: Pick<CalendarEvent, 'allDay' | 'date' | 'endDate' | 'endTime'>,
+	event: Pick<CalendarEvent, 'allDay' | 'date' | 'endDate' | 'startTime' | 'endTime'>,
 ): DateRange | null => {
 	if (!event.date) return null;
 	const startKey = event.date;
-	let endKey = event.endDate ?? startKey;
+	const timedRange = resolveEffectiveTimedEventRange(event);
+	let endKey = timedRange?.endKey ?? event.endDate ?? startKey;
 	const endMinutes = toMinutes(event.endTime);
 	// Treat next-day 00:00 as an exclusive boundary for timed events.
-	if (!event.allDay && endMinutes === 0 && event.endDate && event.endDate !== startKey) {
-		endKey = formatDateKey(addDays(parseDateKey(event.endDate), -1));
+	if (!event.allDay && endMinutes === 0 && endKey !== startKey) {
+		endKey = formatDateKey(addDays(parseDateKey(endKey), -1));
 	}
 	if (compareDateKey(endKey, startKey) < 0) {
 		endKey = startKey;

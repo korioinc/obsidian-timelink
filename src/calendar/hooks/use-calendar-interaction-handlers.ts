@@ -6,10 +6,7 @@ import type { CreateEventState, EventModalState } from '../types';
 import type { EventSegment } from '../types';
 import { useCallback, useState } from 'preact/hooks';
 
-export type UseCalendarInteractionHandlersParams = Omit<
-	UseEventInteractionHandlersParams,
-	'dateClick'
-> & {
+type UseCalendarInteractionHandlersParams = Omit<UseEventInteractionHandlersParams, 'dateClick'> & {
 	dateClick?: {
 		moreMenu: { dateKey: string } | null;
 		setMoreMenu: (next: { dateKey: string } | null) => void;
@@ -18,14 +15,14 @@ export type UseCalendarInteractionHandlersParams = Omit<
 	};
 };
 
-export type CalendarModalState = {
+type CalendarModalState = {
 	modal: EventModalState | null;
 	setModal: (next: EventModalState | null) => void;
 	createModal: CreateEventState | null;
 	setCreateModal: (next: CreateEventState | null) => void;
 };
 
-export type CalendarMoreMenuState = {
+type CalendarMoreMenuState = {
 	moreMenu: { dateKey: string } | null;
 	setMoreMenu: (next: { dateKey: string } | null) => void;
 	handleCloseMoreMenu: () => void;

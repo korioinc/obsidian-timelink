@@ -2,42 +2,53 @@ import { CALENDAR_VIEW_TYPE } from './calendar/constants';
 import { TimeLinkCalendar } from './calendar/services/model-service';
 import { TimeLinkCalendarView } from './calendar/view.tsx';
 import { registerKanbanCommands } from './commands/kanban';
-import { GANTT_VIEW_ICON, GANTT_VIEW_TYPE } from './gantt/constants';
+import { GANTT_VIEW_TYPE } from './gantt/constants';
 import { TimeLinkGanttView } from './gantt/view/index';
-import { KANBAN_LIST_VIEW_ICON, KANBAN_LIST_VIEW_TYPE } from './kanban-list/constants';
+import { KANBAN_LIST_VIEW_TYPE } from './kanban-list/constants';
 import { TimeLinkKanbanListView } from './kanban-list/view/index';
-import { KANBAN_ICON, KANBAN_VIEW_TYPE } from './kanban/constants';
+import { KANBAN_VIEW_TYPE } from './kanban/constants';
 import { KanbanManager } from './kanban/services/manager-service';
+import {
+	KanbanMarkdownModeTracker,
+	openTrackedMarkdownView,
+} from './kanban/services/markdown-mode-service';
+import { KanbanRibbonController } from './kanban/services/ribbon-service';
 import {
 	cleanupMissingTimelinkEventProperties,
 	hasStartupCleanupChanges,
 } from './kanban/services/startup-cleanup-service';
+import { registerKanbanWorkspaceIntegration } from './kanban/services/workspace-integration-service';
 import { openCreateKanbanModal } from './kanban/view/modal';
-import { DEFAULT_SETTINGS, TimeLinkSettingTab, TimeLinkSettings } from './settings';
+import { TimeLinkSettingTab } from './settings';
+import {
+	normalizeCalendarFolderPath,
+	normalizeTimeLinkSettings,
+	type TimeLinkSettings,
+} from './settings-model';
 import { formatDateKey } from './shared/event/model-utils';
 import {
 	KANBAN_FRONTMATTER_KEY,
 	KANBAN_FRONTMATTER_VALUE,
 } from './shared/frontmatter/kanban-frontmatter';
+import { openOrRevealPluginView } from './shared/view/open-plugin-view';
 import { TIMELINE_VIEW_ICON, TIMELINE_VIEW_TYPE } from './timeline/constants';
 import { TimeLinkTimelineView } from './timeline/view.tsx';
-import { around } from './utils/around';
-import { MarkdownView, Menu, Notice, Plugin, TFile, TFolder, WorkspaceLeaf } from 'obsidian';
+import { Notice, Plugin, TFile, WorkspaceLeaf } from 'obsidian';
 
 export default class TimeLinkPlugin extends Plugin {
-	settings: TimeLinkSettings;
-	calendar: TimeLinkCalendar;
-	kanbanManager: KanbanManager;
-	private kanbanMarkdownModes = new Map<string, 'readonly' | 'editing'>();
-	private kanbanLeafFilePaths = new Map<string, string>();
-	private kanbanRibbonIcon: HTMLElement | null = null;
-	private kanbanListRibbonIcon: HTMLElement | null = null;
-	private ganttRibbonIcon: HTMLElement | null = null;
+	settings!: TimeLinkSettings;
+	calendar!: TimeLinkCalendar;
+	kanbanManager!: KanbanManager;
+	private readonly kanbanMarkdownModes = new KanbanMarkdownModeTracker();
+	private kanbanRibbons: KanbanRibbonController | null = null;
 	private startupCleanupStarted = false;
+	private settingsUpdateQueue: Promise<void> = Promise.resolve();
+	private isUnloaded = false;
 	getTodayDateKey(): string {
 		return formatDateKey(new Date());
 	}
 	async onload() {
+		this.isUnloaded = false;
 		await this.loadSettings();
 		this.calendar = new TimeLinkCalendar(this, this.settings.calendarFolderPath);
 
@@ -48,214 +59,107 @@ export default class TimeLinkPlugin extends Plugin {
 
 		this.registerExtensions(['kanban'], 'markdown');
 
-		const app = this.app;
-		const kanbanMarkdownModes = this.kanbanMarkdownModes;
-		const kanbanLeafFilePaths = this.kanbanLeafFilePaths;
-		const clearKanbanLeafTracking = (leafId: string) => this.clearKanbanLeafTracking(leafId);
-		const setKanbanView = (leaf: WorkspaceLeaf) => this.setKanbanView(leaf);
-		const isKanbanEnabled = () => this.settings.enableKanban;
 		this.kanbanManager = new KanbanManager(this);
 		this.kanbanManager.registerView();
+		this.kanbanRibbons = new KanbanRibbonController(this, {
+			onCreateBoard: () => openCreateKanbanModal(this),
+			onOpenBoardList: () =>
+				this.runWorkspaceAction('Failed to open kanban list', 'Failed to open kanban list.', () =>
+					this.openKanbanListView(),
+				),
+			onOpenGantt: () =>
+				this.runWorkspaceAction('Failed to open gantt', 'Failed to open gantt.', () =>
+					this.openGanttView(),
+				),
+		});
+		registerKanbanWorkspaceIntegration({
+			app: this.app,
+			markdownModes: this.kanbanMarkdownModes,
+			isKanbanEnabled: () => this.settings.enableKanban,
+			openBoard: (file) => this.kanbanManager.openBoard(file),
+			openCreateBoard: (folderPath) => openCreateKanbanModal(this, folderPath),
+			setKanbanView: (leaf) => this.setKanbanView(leaf),
+			registerCleanup: (cleanup) => this.register(cleanup),
+			registerEvent: (event) => this.registerEvent(event),
+		});
 
 		registerKanbanCommands(this);
 
 		await this.syncKanbanState();
 
 		this.addRibbonIcon('calendar', 'Open calendar', () => {
-			void this.openCalendarView();
+			this.runWorkspaceAction('Failed to open calendar', 'Failed to open calendar.', () =>
+				this.openCalendarView(),
+			);
 		});
 
 		this.addRibbonIcon(TIMELINE_VIEW_ICON, 'Open timeline', () => {
-			void this.openTimelineView();
+			this.runWorkspaceAction('Failed to open timeline', 'Failed to open timeline.', () =>
+				this.openTimelineView(),
+			);
 		});
 
 		this.addCommand({
 			id: 'open-timeline',
 			name: 'Open timeline',
 			callback: () => {
-				void this.openTimelineView();
+				this.runWorkspaceAction('Failed to open timeline', 'Failed to open timeline.', () =>
+					this.openTimelineView(),
+				);
 			},
 		});
-
-		this.registerEvent(
-			this.app.workspace.on('file-open', (file: TFile | null) => {
-				void (async () => {
-					if (!file || !this.settings.enableKanban) return;
-					const content = await this.app.vault.read(file);
-					if (content.includes(`${KANBAN_FRONTMATTER_KEY}: ${KANBAN_FRONTMATTER_VALUE}`)) {
-						await this.kanbanManager.openBoard(file);
-					}
-				})();
-			}),
-		);
-
-		this.registerEvent(
-			this.app.workspace.on('file-menu', (menu: Menu, file) => {
-				if (!this.settings.enableKanban) return;
-				if (file instanceof TFolder) {
-					menu.addItem((item) => {
-						item.setTitle('New kanban board');
-						item.setIcon('lucide-trello');
-						item.onClick(() => openCreateKanbanModal(this, file.path));
-					});
-				} else if (file instanceof TFile && file.extension === 'md') {
-					menu.addItem((item) => {
-						item.setTitle('Open as kanban board');
-						item.setIcon('lucide-trello');
-						item.onClick(() => this.kanbanManager.openBoard(file));
-					});
-				}
-			}),
-		);
-
-		this.register(
-			around(WorkspaceLeaf.prototype, {
-				detach: (next) =>
-					function (this: WorkspaceLeaf) {
-						const leafId = String((this as { id?: string }).id ?? '');
-						if (leafId) {
-							clearKanbanLeafTracking(leafId);
-						}
-						return next.apply(this);
-					},
-				setViewState: (next) =>
-					function (
-						this: WorkspaceLeaf,
-						state: { type?: string; state?: { file?: string; mode?: string } },
-						...rest: unknown[]
-					) {
-						if (!state || state.type !== 'markdown' || !state.state?.file) {
-							return next.apply(this, [state, ...rest]);
-						}
-						if (!isKanbanEnabled()) {
-							return next.apply(this, [state, ...rest]);
-						}
-
-						const leafId = String((this as { id?: string }).id ?? '');
-						const filePath = state.state.file;
-
-						if (leafId) {
-							kanbanLeafFilePaths.set(leafId, filePath);
-							const mode = kanbanMarkdownModes.get(leafId);
-							if (mode === 'readonly' && state.state?.mode !== 'source') {
-								const nextState = { ...state, state: { ...state.state, mode: 'preview' } };
-								return next.apply(this, [nextState, ...rest]);
-							}
-							if (mode === 'readonly' && state.state?.mode === 'source') {
-								kanbanMarkdownModes.set(leafId, 'editing');
-							}
-						}
-
-						const cache = app.metadataCache.getCache(filePath);
-						if (cache?.frontmatter && cache.frontmatter[KANBAN_FRONTMATTER_KEY]) {
-							const allowMarkdown = kanbanMarkdownModes.get(leafId);
-							if (!allowMarkdown) {
-								const nextState = { ...state, type: KANBAN_VIEW_TYPE };
-								return next.apply(this, [nextState, ...rest]);
-							}
-						}
-
-						return next.apply(this, [state, ...rest]);
-					},
-			}),
-		);
-
-		this.register(
-			around(MarkdownView.prototype, {
-				onPaneMenu: (next) =>
-					function (this: MarkdownView, menu: Menu, source: string) {
-						if (source === 'more-options' && isKanbanEnabled()) {
-							const file = this.file;
-							if (file) {
-								const cache = app.metadataCache.getFileCache(file);
-								if (cache?.frontmatter && cache.frontmatter[KANBAN_FRONTMATTER_KEY]) {
-									menu.addItem((item) => {
-										item.setTitle('Open as kanban board');
-										item.setIcon(KANBAN_ICON);
-										item.setSection('pane');
-										item.onClick(() => {
-											void setKanbanView(this.leaf);
-										});
-									});
-								}
-							}
-						}
-
-						return next.apply(this, [menu, source]);
-					},
-			}),
-		);
 
 		this.addSettingTab(new TimeLinkSettingTab(this.app, this));
 
 		this.app.workspace.onLayoutReady(() => {
 			void this.runStartupCleanupOnce();
-			void this.initTimelineLeafSilently();
+		});
+	}
+
+	private runWorkspaceAction(
+		label: string,
+		failureMessage: string,
+		action: () => Promise<void>,
+	): void {
+		void action().catch((error: unknown) => {
+			console.error(label, error);
+			new Notice(failureMessage);
 		});
 	}
 
 	private async runStartupCleanupOnce(): Promise<void> {
-		if (this.startupCleanupStarted || !this.settings.enableKanban) return;
+		if (this.isUnloaded || this.startupCleanupStarted || !this.settings.enableKanban) return;
 		this.startupCleanupStarted = true;
 		try {
-			const result = await cleanupMissingTimelinkEventProperties(
-				this.app,
-				this.settings.calendarFolderPath,
-			);
-			if (!hasStartupCleanupChanges(result)) return;
+			const result = await cleanupMissingTimelinkEventProperties(this.app);
+			if (this.isUnloaded || !hasStartupCleanupChanges(result)) return;
 			new Notice(`Cleaned ${result.brokenEventLinks} broken event link(s).`);
 		} catch (error) {
 			console.error('Failed to clean broken TimeLink event links', error);
-			new Notice('Failed to clean broken event links.');
+			if (!this.isUnloaded) new Notice('Failed to clean broken event links.');
 		}
 	}
 
 	private async openCalendarView(): Promise<void> {
-		const leaves = this.app.workspace.getLeavesOfType(CALENDAR_VIEW_TYPE);
-		const existingLeaf = leaves[0];
-		if (existingLeaf) {
-			void this.app.workspace.revealLeaf(existingLeaf);
-			return;
-		}
-		const leaf = this.app.workspace.getLeaf('tab') ?? this.app.workspace.getRightLeaf(false);
-		if (!leaf) {
-			new Notice('Unable to open calendar view.');
-			return;
-		}
-		await leaf.setViewState({ type: CALENDAR_VIEW_TYPE, active: true });
-		void this.app.workspace.revealLeaf(leaf);
+		await openOrRevealPluginView(
+			this.app,
+			CALENDAR_VIEW_TYPE,
+			'tab',
+			'Unable to open calendar view.',
+		);
 	}
 
 	private async openTimelineView(): Promise<void> {
-		const leaves = this.app.workspace.getLeavesOfType(TIMELINE_VIEW_TYPE);
-		const existingLeaf = leaves[0];
-		if (existingLeaf) {
-			void this.app.workspace.revealLeaf(existingLeaf);
-			return;
-		}
-		const leaf = this.app.workspace.getRightLeaf(false) ?? this.app.workspace.getLeaf('tab');
-		if (!leaf) {
-			new Notice('Unable to open timeline view.');
-			return;
-		}
-		await leaf.setViewState({ type: TIMELINE_VIEW_TYPE, active: true });
-		void this.app.workspace.revealLeaf(leaf);
+		await openOrRevealPluginView(
+			this.app,
+			TIMELINE_VIEW_TYPE,
+			'right',
+			'Unable to open timeline view.',
+		);
 	}
 
 	private async openGanttView(): Promise<void> {
-		const leaves = this.app.workspace.getLeavesOfType(GANTT_VIEW_TYPE);
-		const existingLeaf = leaves[0];
-		if (existingLeaf) {
-			void this.app.workspace.revealLeaf(existingLeaf);
-			return;
-		}
-		const leaf = this.app.workspace.getLeaf('tab') ?? this.app.workspace.getRightLeaf(false);
-		if (!leaf) {
-			new Notice('Unable to open gantt view.');
-			return;
-		}
-		await leaf.setViewState({ type: GANTT_VIEW_TYPE, active: true });
-		void this.app.workspace.revealLeaf(leaf);
+		await openOrRevealPluginView(this.app, GANTT_VIEW_TYPE, 'tab', 'Unable to open gantt view.');
 	}
 
 	async openKanbanBoard(boardPath: string): Promise<void> {
@@ -268,90 +172,53 @@ export default class TimeLinkPlugin extends Plugin {
 	}
 
 	private async openKanbanListView(): Promise<void> {
-		const leaves = this.app.workspace.getLeavesOfType(KANBAN_LIST_VIEW_TYPE);
-		const existingLeaf = leaves[0];
-		if (existingLeaf) {
-			void this.app.workspace.revealLeaf(existingLeaf);
-			return;
-		}
-		const leaf = this.app.workspace.getLeaf('tab') ?? this.app.workspace.getRightLeaf(false);
-		if (!leaf) {
-			new Notice('Unable to open kanban list view.');
-			return;
-		}
-		await leaf.setViewState({ type: KANBAN_LIST_VIEW_TYPE, active: true });
-		void this.app.workspace.revealLeaf(leaf);
-	}
-
-	private async initTimelineLeafSilently(): Promise<void> {
-		const leaves = this.app.workspace.getLeavesOfType(TIMELINE_VIEW_TYPE);
-		if (leaves.length > 0) {
-			return;
-		}
-		const leaf = this.app.workspace.getRightLeaf(false);
-		if (!leaf) {
-			return;
-		}
-		await leaf.setViewState({ type: TIMELINE_VIEW_TYPE, active: false });
+		await openOrRevealPluginView(
+			this.app,
+			KANBAN_LIST_VIEW_TYPE,
+			'tab',
+			'Unable to open kanban list view.',
+		);
 	}
 
 	onunload() {
+		this.isUnloaded = true;
 		void Promise.allSettled(
 			this.app.workspace
 				.getLeavesOfType(KANBAN_VIEW_TYPE)
 				.map((leaf) => this.setMarkdownView(leaf)),
-		);
-		this.kanbanMarkdownModes.clear();
-		this.kanbanLeafFilePaths.clear();
-		this.removeKanbanRibbonIcon();
-		this.removeKanbanListRibbonIcon();
-		this.removeGanttRibbonIcon();
+		).finally(() => this.kanbanMarkdownModes.clearAll());
+		this.kanbanRibbons?.hide();
 	}
 
 	async setMarkdownView(leaf: WorkspaceLeaf): Promise<void> {
-		await leaf.setViewState({
-			type: 'markdown',
-			state: leaf.view?.getState?.() ?? {},
-		});
+		const leafId = String((leaf as { id?: string }).id ?? '');
+		const state = leaf.view?.getState?.() ?? {};
+		const filePath = (state as { file?: string }).file;
+		if (filePath) this.kanbanMarkdownModes.set(leafId, filePath, 'editing');
+		try {
+			await leaf.setViewState({ type: 'markdown', state });
+		} finally {
+			this.kanbanMarkdownModes.clear(leafId);
+		}
 	}
 
 	async openKanbanAsMarkdown(leaf: WorkspaceLeaf, options: { readOnly: boolean }): Promise<void> {
-		const leafId = String((leaf as { id?: string }).id ?? '');
-		const state = leaf.view?.getState?.() ?? {};
-		const filePath =
-			(state as { file?: string }).file ??
-			(leaf.view instanceof MarkdownView ? leaf.view.file?.path : undefined);
-
-		if (leafId) {
-			this.kanbanMarkdownModes.set(leafId, options.readOnly ? 'readonly' : 'editing');
-			if (filePath) {
-				this.kanbanLeafFilePaths.set(leafId, filePath);
-			}
-		}
-
-		const nextState = options.readOnly ? { ...state, mode: 'preview' } : state;
-
-		await leaf.setViewState({
-			type: 'markdown',
-			state: nextState,
-		});
+		await openTrackedMarkdownView(this.kanbanMarkdownModes, leaf, options);
 	}
 
 	async setKanbanView(leaf: WorkspaceLeaf): Promise<void> {
+		if (this.isUnloaded) return;
 		const leafId = String((leaf as { id?: string }).id ?? '');
 		if (leafId) {
-			this.kanbanMarkdownModes.delete(leafId);
-			this.kanbanLeafFilePaths.delete(leafId);
+			this.kanbanMarkdownModes.clear(leafId);
 		}
 		await leaf.setViewState({
 			type: KANBAN_VIEW_TYPE,
 			state: leaf.view?.getState?.() ?? {},
 		});
-	}
-
-	clearKanbanLeafTracking(leafId: string): void {
-		this.kanbanMarkdownModes.delete(leafId);
-		this.kanbanLeafFilePaths.delete(leafId);
+		if (this.isUnloaded) {
+			await this.setMarkdownView(leaf);
+		}
 	}
 
 	private async restoreKanbanLeaves(): Promise<void> {
@@ -363,80 +230,72 @@ export default class TimeLinkPlugin extends Plugin {
 			const file = (leaf.view as { file?: TFile | null }).file;
 			if (!file) return false;
 			const cache = this.app.metadataCache.getFileCache(file);
-			return Boolean(cache?.frontmatter && cache.frontmatter[KANBAN_FRONTMATTER_KEY]);
+			return cache?.frontmatter?.[KANBAN_FRONTMATTER_KEY] === KANBAN_FRONTMATTER_VALUE;
 		});
 		await Promise.allSettled(targets.map((leaf) => this.setKanbanView(leaf)));
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as Partial<TimeLinkSettings>,
-		);
+		this.settings = normalizeTimeLinkSettings(await this.loadData());
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
 
+	private enqueueSettingsUpdate(update: () => Promise<void>): Promise<void> {
+		const result = this.settingsUpdateQueue.then(update);
+		this.settingsUpdateQueue = result.catch(() => undefined);
+		return result;
+	}
+
+	async updateCalendarFolderPath(value: string): Promise<void> {
+		const calendarFolderPath = normalizeCalendarFolderPath(value);
+		return this.enqueueSettingsUpdate(async () => {
+			if (calendarFolderPath === this.settings.calendarFolderPath) return;
+
+			const previousSettings = this.settings;
+			this.settings = { ...this.settings, calendarFolderPath };
+			try {
+				await this.saveSettings();
+			} catch (error) {
+				this.settings = previousSettings;
+				throw error;
+			}
+			if (!this.isUnloaded) {
+				this.calendar.getCalendar().setDirectory(calendarFolderPath);
+			}
+		});
+	}
+
+	async updateKanbanEnabled(enableKanban: boolean): Promise<void> {
+		return this.enqueueSettingsUpdate(async () => {
+			if (enableKanban === this.settings.enableKanban) return;
+
+			const previousSettings = this.settings;
+			this.settings = { ...this.settings, enableKanban };
+			try {
+				await this.saveSettings();
+			} catch (error) {
+				this.settings = previousSettings;
+				throw error;
+			}
+			if (!this.isUnloaded) {
+				await this.syncKanbanState();
+			}
+		});
+	}
+
 	async syncKanbanState(): Promise<void> {
+		if (this.isUnloaded) return;
 		if (!this.settings.enableKanban) {
 			const leaves = this.app.workspace.getLeavesOfType(KANBAN_VIEW_TYPE);
 			await Promise.allSettled(leaves.map((leaf) => this.setMarkdownView(leaf)));
-			this.kanbanMarkdownModes.clear();
-			this.kanbanLeafFilePaths.clear();
-			this.removeKanbanRibbonIcon();
-			this.removeKanbanListRibbonIcon();
-			this.removeGanttRibbonIcon();
+			this.kanbanMarkdownModes.clearAll();
+			this.kanbanRibbons?.hide();
 			return;
 		}
-		this.ensureKanbanRibbonIcon();
-		this.ensureKanbanListRibbonIcon();
-		this.ensureGanttRibbonIcon();
+		this.kanbanRibbons?.show();
 		await this.restoreKanbanLeaves();
-	}
-
-	private ensureKanbanRibbonIcon(): void {
-		if (this.kanbanRibbonIcon) return;
-		this.kanbanRibbonIcon = this.addRibbonIcon('lucide-trello', 'Create kanban board', () => {
-			openCreateKanbanModal(this);
-		});
-	}
-
-	private ensureKanbanListRibbonIcon(): void {
-		if (this.kanbanListRibbonIcon) return;
-		this.kanbanListRibbonIcon = this.addRibbonIcon(
-			KANBAN_LIST_VIEW_ICON,
-			'Open kanban list',
-			() => {
-				void this.openKanbanListView();
-			},
-		);
-	}
-
-	private ensureGanttRibbonIcon(): void {
-		if (this.ganttRibbonIcon) return;
-		this.ganttRibbonIcon = this.addRibbonIcon(GANTT_VIEW_ICON, 'Open gantt', () => {
-			void this.openGanttView();
-		});
-	}
-
-	private removeKanbanRibbonIcon(): void {
-		if (!this.kanbanRibbonIcon) return;
-		this.kanbanRibbonIcon.remove();
-		this.kanbanRibbonIcon = null;
-	}
-
-	private removeKanbanListRibbonIcon(): void {
-		if (!this.kanbanListRibbonIcon) return;
-		this.kanbanListRibbonIcon.remove();
-		this.kanbanListRibbonIcon = null;
-	}
-
-	private removeGanttRibbonIcon(): void {
-		if (!this.ganttRibbonIcon) return;
-		this.ganttRibbonIcon.remove();
-		this.ganttRibbonIcon = null;
 	}
 }

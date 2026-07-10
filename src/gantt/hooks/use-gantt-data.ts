@@ -1,10 +1,14 @@
 import { KANBAN_LIST_MAX_DEPTH } from '../../kanban-list/constants';
-import { isPathWithinDepth, isWithinDepth } from '../../kanban-list/utils/path';
+import { formatDateKey, parseDateKey } from '../../shared/event/model-utils';
 import { useDebouncedReload } from '../../shared/hooks/use-debounced-reload';
-import { isPathInDirectory } from '../../shared/vault/register-vault-path-refresh';
-import { registerVaultRefresh } from '../../shared/vault/register-vault-refresh';
+import { useMinuteTicker } from '../../shared/hooks/use-minute-ticker';
 import { buildGanttYearView, collectGanttBoardSchedules } from '../services/model-service';
-import type { GanttBoardSchedule, GanttPluginContext } from '../types';
+import { registerGanttDataRefresh } from '../services/refresh-service';
+import type {
+	GanttBoardSchedule,
+	GanttCalendarDirectorySource,
+	GanttPluginContext,
+} from '../types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 
 type UseGanttDataResult = {
@@ -17,55 +21,83 @@ type UseGanttDataResult = {
 	goToCurrentYear: () => void;
 };
 
+export const subscribeToGanttCalendarDirectory = (
+	calendar: GanttCalendarDirectorySource,
+	onDirectoryChange: (directory: string) => void,
+): (() => void) => {
+	onDirectoryChange(calendar.getDirectory());
+	return calendar.onDirectoryChange(() => onDirectoryChange(calendar.getDirectory()));
+};
+
 export const useGanttData = (plugin: GanttPluginContext): UseGanttDataResult => {
+	const calendar = plugin.calendar.getCalendar();
+	const [calendarFolderPath, setCalendarFolderPath] = useState(() => calendar.getDirectory());
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 	const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
 	const [boards, setBoards] = useState<GanttBoardSchedule[]>([]);
 	const dependencyPathsRef = useRef<Set<string>>(new Set());
+	const requestVersionRef = useRef(0);
+	const currentDayKey = formatDateKey(useMinuteTicker());
 
-	const reloadData = useCallback(async () => {
+	const reloadOnce = useCallback(async () => {
+		const requestVersion = requestVersionRef.current;
 		setIsLoading(true);
 		setErrorMessage(null);
 		try {
 			const nextBoards = await collectGanttBoardSchedules({
 				app: plugin.app,
-				calendarFolderPath: plugin.settings.calendarFolderPath,
+				calendarFolderPath,
 				maxDepth: KANBAN_LIST_MAX_DEPTH,
 			});
+			if (requestVersion !== requestVersionRef.current) return;
 			dependencyPathsRef.current = new Set(nextBoards.flatMap((board) => board.dependencyPaths));
 			setBoards(nextBoards);
 		} catch (error) {
+			if (requestVersion !== requestVersionRef.current) return;
 			console.error('Failed to load gantt data', error);
 			setErrorMessage('Failed to load gantt view.');
 		} finally {
-			setIsLoading(false);
+			if (requestVersion === requestVersionRef.current) {
+				setIsLoading(false);
+			}
 		}
-	}, [plugin.app, plugin.settings.calendarFolderPath]);
+	}, [calendarFolderPath, plugin.app]);
 
-	const { schedule: scheduleReload } = useDebouncedReload(() => {
-		void reloadData();
-	}, 150);
+	const invalidateRequest = useCallback(() => {
+		requestVersionRef.current += 1;
+	}, []);
+	const { run: reloadData, schedule: scheduleReload } = useDebouncedReload(
+		reloadOnce,
+		150,
+		invalidateRequest,
+	);
+
+	useEffect(() => {
+		return subscribeToGanttCalendarDirectory(calendar, setCalendarFolderPath);
+	}, [calendar]);
 
 	useEffect(() => {
 		void reloadData();
-	}, [reloadData]);
+		return () => {
+			requestVersionRef.current += 1;
+		};
+	}, [calendarFolderPath, reloadData]);
 
 	useEffect(() => {
-		return registerVaultRefresh(
-			plugin.app.vault,
-			(file, oldPath) =>
-				isWithinDepth(file, KANBAN_LIST_MAX_DEPTH) ||
-				isPathWithinDepth(oldPath, KANBAN_LIST_MAX_DEPTH) ||
-				isPathInDirectory(file.path, plugin.settings.calendarFolderPath) ||
-				isPathInDirectory(oldPath, plugin.settings.calendarFolderPath) ||
-				dependencyPathsRef.current.has(file.path) ||
-				(oldPath ? dependencyPathsRef.current.has(oldPath) : false),
-			scheduleReload,
-		);
-	}, [plugin.app.vault, plugin.settings.calendarFolderPath, scheduleReload]);
+		return registerGanttDataRefresh({
+			app: plugin.app,
+			calendarFolderPath,
+			maxDepth: KANBAN_LIST_MAX_DEPTH,
+			getDependencyPaths: () => dependencyPathsRef.current,
+			onReload: scheduleReload,
+		});
+	}, [calendarFolderPath, plugin.app, scheduleReload]);
 
-	const yearView = useMemo(() => buildGanttYearView(boards, selectedYear), [boards, selectedYear]);
+	const yearView = useMemo(
+		() => buildGanttYearView(boards, selectedYear, parseDateKey(currentDayKey)),
+		[boards, currentDayKey, selectedYear],
+	);
 
 	return {
 		errorMessage,

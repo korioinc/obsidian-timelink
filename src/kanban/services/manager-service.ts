@@ -1,5 +1,6 @@
 import { KANBAN_VIEW_TYPE } from '../constants';
 import { KanbanView, type KanbanViewPluginContext } from '../view';
+import { resolveKanbanBoardCreation } from './board-creation-policy';
 import { getLeafFilePath } from './leaf-service';
 import { buildKanbanBoardMarkdown } from './template-service';
 import { TFile, WorkspaceLeaf, type App } from 'obsidian';
@@ -17,18 +18,12 @@ export class KanbanManager {
 	}
 
 	async createBoard(title: string, folderPath?: string): Promise<TFile> {
-		const safeTitle = title.trim();
-		const filename = safeTitle.length ? `${safeTitle}.md` : 'Kanban Board.md';
-		const basePath = folderPath ? folderPath.replace(/\/$/, '') : '';
-		const path = basePath ? `${basePath}/${filename}` : filename;
-		const existing = this.plugin.app.vault.getAbstractFileByPath(path);
+		const resolution = resolveKanbanBoardCreation(title, folderPath, (path) =>
+			this.plugin.app.vault.getAbstractFileByPath(path),
+		);
 
-		if (existing instanceof TFile) {
-			return existing;
-		}
-
-		const markdown = buildKanbanBoardMarkdown({ title: safeTitle || 'Kanban Board' });
-		return this.plugin.app.vault.create(path, markdown);
+		const markdown = buildKanbanBoardMarkdown({ title: resolution.title });
+		return this.plugin.app.vault.create(resolution.path, markdown);
 	}
 
 	async openBoard(file: TFile): Promise<void> {

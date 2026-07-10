@@ -7,6 +7,7 @@ import type {
 	KanbanBoardSettingsView,
 	KanbanBoardSettings,
 } from '../types';
+import { createBoardAndAttemptOpen } from './create-board-flow';
 import { Modal, Notice, Setting, type App, type TFile } from 'obsidian';
 
 type CompactInputModalOptions = {
@@ -15,6 +16,7 @@ type CompactInputModalOptions = {
 	placeholder: string;
 	submitLabel: string;
 	emptyNotice: string;
+	failureNotice: string;
 	successNotice?: string;
 	onSubmit: (value: string) => Promise<void>;
 };
@@ -59,21 +61,38 @@ function buildCompactInputModal(modal: Modal, options: CompactInputModalOptions)
 		cls: 'h-8 px-2.5 rounded border border-[var(--background-modifier-border)] bg-[var(--background-primary)] text-[11px] text-[color:var(--text-normal)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]',
 	});
 
-	form.createEl('button', {
+	const submitButton = form.createEl('button', {
 		text: options.submitLabel,
 		cls: 'h-8 px-3 rounded border border-[var(--background-modifier-border)] bg-[var(--background-secondary)] text-[11px] font-semibold text-[color:var(--text-muted)] hover:text-[color:var(--text-normal)] hover:border-[var(--background-modifier-border-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--text-accent)]',
 		type: 'submit',
 	});
+	let isSubmitting = false;
 
 	form.addEventListener('submit', (event) => {
+		event.preventDefault();
+		if (isSubmitting) return;
 		void (async () => {
-			event.preventDefault();
 			const value = input.value.trim();
 			if (!value) {
 				new Notice(options.emptyNotice);
 				return;
 			}
-			await options.onSubmit(value);
+			isSubmitting = true;
+			input.disabled = true;
+			submitButton.disabled = true;
+			form.setAttribute('aria-busy', 'true');
+			try {
+				await options.onSubmit(value);
+			} catch (error) {
+				console.error('Failed to submit modal input', error);
+				new Notice(error instanceof Error && error.message ? error.message : options.failureNotice);
+				return;
+			} finally {
+				isSubmitting = false;
+				input.disabled = false;
+				submitButton.disabled = false;
+				form.removeAttribute('aria-busy');
+			}
 			if (options.successNotice) {
 				new Notice(options.successNotice);
 			}
@@ -101,10 +120,18 @@ class KanbanCreateModal extends Modal {
 			placeholder: 'Kanban board name',
 			submitLabel: 'Create',
 			emptyNotice: 'Please enter a board name.',
-			successNotice: 'Kanban board created',
+			failureNotice: 'Failed to create kanban board.',
 			onSubmit: async (value) => {
-				const file = await this.plugin.kanbanManager.createBoard(value, this.folderPath);
-				await this.plugin.kanbanManager.openBoard(file);
+				const result = await createBoardAndAttemptOpen(
+					() => this.plugin.kanbanManager.createBoard(value, this.folderPath),
+					(file) => this.plugin.kanbanManager.openBoard(file),
+				);
+				if (!result.opened) {
+					console.error('Created kanban board but failed to open it', result.openError);
+					new Notice('Kanban board created, but it could not be opened.');
+					return;
+				}
+				new Notice('Kanban board created');
 			},
 		});
 	}
@@ -139,10 +166,19 @@ function addVisibilityToggleSetting(
 		.setDesc(config.description)
 		.addToggle((toggle) => {
 			toggle.setValue(resolveToggleValue(settings, config.key));
-			toggle.onChange((value) => {
-				void view.updateBoardSettings({
-					[config.key]: value ? undefined : false,
-				});
+			toggle.onChange(async (value) => {
+				toggle.setDisabled(true);
+				try {
+					await view.updateBoardSettings({
+						[config.key]: value ? undefined : false,
+					});
+				} catch (error) {
+					console.error(`Failed to update ${config.key} setting`, error);
+					toggle.setValue(!value);
+					new Notice('Failed to update board setting.');
+				} finally {
+					toggle.setDisabled(false);
+				}
 			});
 		});
 }
@@ -207,13 +243,21 @@ function addBoardColorSetting(
 		})
 		.addButton((button) => {
 			button.setButtonText('Apply').setCta();
-			button.onClick(() => {
+			button.onClick(async () => {
 				const normalized = normalizeHexColor(pendingColor);
 				if (!normalized && pendingColor.trim() !== '') {
 					new Notice('Please enter a valid hex color.');
 					return;
 				}
-				void view.applyBoardColorChange(normalized ?? undefined);
+				button.setDisabled(true);
+				try {
+					await view.applyBoardColorChange(normalized ?? undefined);
+				} catch (error) {
+					console.error('Failed to apply board color', error);
+					new Notice('Failed to apply board color.');
+				} finally {
+					button.setDisabled(false);
+				}
 			});
 		});
 }

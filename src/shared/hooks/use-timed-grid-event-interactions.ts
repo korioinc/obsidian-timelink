@@ -29,13 +29,14 @@ type TimedChangeHandler = (
 	previous: EditableEventResponse,
 ) => Promise<void> | void;
 
-export type ResizeCommitEntries = {
+type ResizeCommitEntries = {
 	next: EditableEventResponse;
 	previous: EditableEventResponse;
 };
 
 type UseTimedGridEventInteractionsParams = {
 	defaultEventColor: string;
+	resizeStepMinutes: number;
 	isResizingRef: { current: boolean };
 	onSaveEvent: TimedChangeHandler;
 	onMoveEvent: TimedChangeHandler;
@@ -85,8 +86,14 @@ export const buildDefaultResizeCommitEntries = (
 	segment: EventSegment,
 	hoverDateKey: string | null,
 	hoverMinutes: number | null,
+	minimumDurationMinutes?: number,
 ): ResizeCommitEntries => {
-	const nextEvent = buildTimedResizeEvent(segment, hoverDateKey, hoverMinutes);
+	const nextEvent = buildTimedResizeEvent(
+		segment,
+		hoverDateKey,
+		hoverMinutes,
+		minimumDurationMinutes,
+	);
 	const previous: EditableEventResponse = [segment.event, segment.location];
 	const next: EditableEventResponse = [nextEvent, segment.location];
 	return { next, previous };
@@ -96,6 +103,7 @@ const shouldAlwaysCommit = () => true;
 
 export const useTimedGridEventInteractions = ({
 	defaultEventColor,
+	resizeStepMinutes,
 	isResizingRef,
 	onSaveEvent,
 	onMoveEvent,
@@ -106,7 +114,7 @@ export const useTimedGridEventInteractions = ({
 	onDragPreview,
 	setResizeRefOnDragStart = false,
 	clearResizeRefOnDragEnd = false,
-	buildResizeCommitEntries = buildDefaultResizeCommitEntries,
+	buildResizeCommitEntries,
 	shouldCommitResize = shouldAlwaysCommit,
 	clearDragStateAfterDrop = false,
 }: UseTimedGridEventInteractionsParams): UseTimedGridEventInteractionsResult => {
@@ -170,11 +178,14 @@ export const useTimedGridEventInteractions = ({
 			setTimedResizeHoverMinutes(next.minutes);
 		};
 		const handlePointerUp = () => {
-			const entries = buildResizeCommitEntries(
-				timedResizing,
-				timedResizeHoverDateKey,
-				timedResizeHoverMinutes,
-			);
+			const entries = buildResizeCommitEntries
+				? buildResizeCommitEntries(timedResizing, timedResizeHoverDateKey, timedResizeHoverMinutes)
+				: buildDefaultResizeCommitEntries(
+						timedResizing,
+						timedResizeHoverDateKey,
+						timedResizeHoverMinutes,
+						resizeStepMinutes,
+					);
 			if (shouldCommitResize(entries)) {
 				void onSaveEvent(entries.next, entries.previous);
 			}
@@ -191,6 +202,7 @@ export const useTimedGridEventInteractions = ({
 		buildResizeCommitEntries,
 		isResizingRef,
 		onSaveEvent,
+		resizeStepMinutes,
 		shouldCommitResize,
 		timedResizing,
 		timedResizeHoverDateKey,
@@ -276,8 +288,14 @@ export const useTimedGridEventInteractions = ({
 	}, [clearDragStateAfterDrop, clearResizeRefOnDragEnd, isResizingRef, timedDragging]);
 
 	const timedResizeRange = useMemo(
-		() => deriveTimedResizeRange(timedResizing, timedResizeHoverDateKey, timedResizeHoverMinutes),
-		[timedResizing, timedResizeHoverDateKey, timedResizeHoverMinutes],
+		() =>
+			deriveTimedResizeRange(
+				timedResizing,
+				timedResizeHoverDateKey,
+				timedResizeHoverMinutes,
+				resizeStepMinutes,
+			),
+		[timedResizing, timedResizeHoverDateKey, timedResizeHoverMinutes, resizeStepMinutes],
 	);
 	const timedDragRange = useMemo(
 		() => deriveTimedDragRange(timedDragging, timedDragHoverDateKey, timedDragHoverMinutes),

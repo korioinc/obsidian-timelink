@@ -6,7 +6,7 @@ import {
 import { createNotice } from '../services/notice-service';
 import { useEventModals } from './use-event-modals';
 import type { App } from 'obsidian';
-import { useMemo } from 'preact/hooks';
+import { useEffect, useMemo } from 'preact/hooks';
 
 export type UseEventInteractionHandlersParams = Omit<
 	BuildEventInteractionHandlersParams,
@@ -31,6 +31,13 @@ export const useEventInteractionHandlers = ({
 	dateClick,
 }: UseEventInteractionHandlersParams) => {
 	const notice = useMemo(() => createNotice(), []);
+	const deleteConfirmationController = useMemo(() => new AbortController(), []);
+	useEffect(
+		() => () => {
+			deleteConfirmationController.abort();
+		},
+		[deleteConfirmationController],
+	);
 	const handlers = useMemo(
 		() =>
 			createEventInteractionHandlers({
@@ -44,7 +51,8 @@ export const useEventInteractionHandlers = ({
 				onSaveEvent,
 				onCreateEvent,
 				onDeleteEvent,
-				confirmDeleteEvent: (entry) => requestDeleteEventConfirmation(app, entry[1]),
+				confirmDeleteEvent: (entry) =>
+					requestDeleteEventConfirmation(app, entry[1], deleteConfirmationController.signal),
 				onOpenNote,
 				notice,
 				dateClick,
@@ -52,6 +60,7 @@ export const useEventInteractionHandlers = ({
 		[
 			createModal,
 			dateClick,
+			deleteConfirmationController,
 			endSelection,
 			isResizingRef,
 			modal,

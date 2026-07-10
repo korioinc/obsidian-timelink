@@ -23,20 +23,29 @@ const createBoardMarkdown = (cardTitle: string): string =>
 
 const runCleanup = (
 	app: Parameters<typeof cleanupMissingTimelinkEventProperties>[0],
-	calendarFolderPath = 'Events',
 ): Promise<Awaited<ReturnType<typeof cleanupMissingTimelinkEventProperties>>> =>
-	cleanupMissingTimelinkEventProperties(app, calendarFolderPath);
+	cleanupMissingTimelinkEventProperties(app);
 
 function createMockApp(params: {
 	frontmatterByPath: Record<string, Record<string, unknown> | undefined>;
 	markdownByPath: Record<string, string>;
 	staleLinkDestByPath?: Record<string, string>;
+	freshMarkdownByPath?: Record<string, string>;
+	freshMarkdownSequenceByPath?: Record<string, string[]>;
+	missingAfterSnapshotPaths?: string[];
+	replaceAfterSnapshotPaths?: string[];
 }) {
 	const filesByPath = new Map(
 		Object.keys(params.markdownByPath).map((path) => [path, createFile(path)] as const),
 	);
 	const trashCalls: string[] = [];
 	const modifyCalls: string[] = [];
+	const freshReadCalls: string[] = [];
+	const snapshottedPaths = new Set<string>();
+	const missingAfterSnapshotPaths = new Set(params.missingAfterSnapshotPaths ?? []);
+	const replaceAfterSnapshotPaths = new Set(params.replaceAfterSnapshotPaths ?? []);
+	const freshReadIndexes = new Map<string, number>();
+	const replacementFilesByPath = new Map<string, MockFile>();
 
 	const resolveByLinkPath = (linkPath: string): MockFile | null => {
 		const stalePath = params.staleLinkDestByPath?.[linkPath];
@@ -52,8 +61,32 @@ function createMockApp(params: {
 	const app = {
 		vault: {
 			getMarkdownFiles: () => Array.from(filesByPath.values()),
-			getAbstractFileByPath: (path: string) => filesByPath.get(path) ?? null,
-			cachedRead: (file: MockFile) => Promise.resolve(params.markdownByPath[file.path] ?? ''),
+			getAbstractFileByPath: (path: string) => {
+				if (missingAfterSnapshotPaths.has(path) && snapshottedPaths.has(path)) return null;
+				if (replaceAfterSnapshotPaths.has(path) && snapshottedPaths.has(path)) {
+					const replacement = replacementFilesByPath.get(path) ?? createFile(path);
+					replacementFilesByPath.set(path, replacement);
+					return replacement;
+				}
+				return filesByPath.get(path) ?? null;
+			},
+			cachedRead: (file: MockFile) => {
+				snapshottedPaths.add(file.path);
+				return Promise.resolve(params.markdownByPath[file.path] ?? '');
+			},
+			read: (file: MockFile) => {
+				freshReadCalls.push(file.path);
+				const sequence = params.freshMarkdownSequenceByPath?.[file.path];
+				const readIndex = freshReadIndexes.get(file.path) ?? 0;
+				freshReadIndexes.set(file.path, readIndex + 1);
+				const markdown =
+					sequence?.[Math.min(readIndex, sequence.length - 1)] ??
+					params.freshMarkdownByPath?.[file.path] ??
+					params.markdownByPath[file.path] ??
+					'';
+				params.markdownByPath[file.path] = markdown;
+				return Promise.resolve(markdown);
+			},
 			modify: (file: MockFile, data: string) => {
 				params.markdownByPath[file.path] = data;
 				modifyCalls.push(file.path);
@@ -86,7 +119,7 @@ function createMockApp(params: {
 		},
 	};
 
-	return { app, trashCalls, modifyCalls };
+	return { app, trashCalls, modifyCalls, freshReadCalls };
 }
 
 void test('unlinkFirstWikiLinkTitle replaces the primary card link with display text', () => {
@@ -104,7 +137,7 @@ void test('cleanupMissingTimelinkEventProperties deletes property-less event and
 	const markdownByPath = {
 		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
 		'Cards/Task.md': ['---', `${TIMELINK_EVENT_KEY}: "[[Events/Broken.md]]"`, '---', ''].join('\n'),
-		'Events/Broken.md': '2026-05-19 broken event\n',
+		'Events/Broken.md': '',
 	};
 	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
 		'Boards/Main.md': { 'kanban-plugin': 'board' },
@@ -123,7 +156,7 @@ void test('cleanupMissingTimelinkEventProperties deletes property-less event and
 		kanbanCardLinksCleared: 1,
 		kanbanBoardsUpdated: 1,
 	});
-	assert.deepEqual(trashCalls, ['Events/Broken.md', 'Cards/Task.md']);
+	assert.deepEqual([...trashCalls].sort(), ['Cards/Task.md', 'Events/Broken.md']);
 	assert.deepEqual(modifyCalls, ['Boards/Main.md']);
 	assert.match(markdownByPath['Boards/Main.md'], /- \[ \] Task\n/);
 	assert.strictEqual(/\[\[Cards\/Task/.test(markdownByPath['Boards/Main.md']), false);
@@ -160,6 +193,66 @@ void test('cleanupMissingTimelinkEventProperties keeps nonempty linked note and 
 		markdownByPath['Boards/Main.md'].includes('- [ ] [[Cards/Task|Task]]\n  keep this detail\n'),
 		true,
 	);
+});
+
+void test('cleanupMissingTimelinkEventProperties preserves card notes with user frontmatter', async () => {
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': [
+			'---',
+			`${TIMELINK_EVENT_KEY}: "[[Events/Missing.md]]"`,
+			'tags: [important]',
+			'---',
+			'',
+		].join('\n'),
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': {
+			[TIMELINK_EVENT_KEY]: '[[Events/Missing.md]]',
+			tags: ['important'],
+		},
+	};
+	const { app, trashCalls, modifyCalls } = createMockApp({ frontmatterByPath, markdownByPath });
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.cardNotesDeleted, 0);
+	assert.strictEqual(result.cardEventLinksRemoved, 1);
+	assert.deepEqual(trashCalls, []);
+	assert.deepEqual(modifyCalls, []);
+	assert.deepEqual(frontmatterByPath['Cards/Task.md']?.tags, ['important']);
+	assert.strictEqual(frontmatterByPath['Cards/Task.md']?.[TIMELINK_EVENT_KEY], undefined);
+});
+
+void test('cleanupMissingTimelinkEventProperties preserves nonempty property-less event notes', async () => {
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': [
+			'---',
+			`${TIMELINK_EVENT_KEY}: "[[Events/User Note.md]]"`,
+			'---',
+			'',
+			'# Card note',
+		].join('\n'),
+		'Events/User Note.md': '# User content\n',
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/User Note.md]]' },
+		'Events/User Note.md': undefined,
+	};
+	const { app, trashCalls, modifyCalls } = createMockApp({ frontmatterByPath, markdownByPath });
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.brokenEventLinks, 1);
+	assert.strictEqual(result.eventsDeleted, 0);
+	assert.strictEqual(result.cardEventLinksRemoved, 1);
+	assert.deepEqual(trashCalls, []);
+	assert.deepEqual(modifyCalls, []);
+	assert.strictEqual(markdownByPath['Events/User Note.md'], '# User content\n');
+	assert.strictEqual(frontmatterByPath['Cards/Task.md']?.[TIMELINK_EVENT_KEY], undefined);
 });
 
 void test('cleanupMissingTimelinkEventProperties ignores stale metadata links after deleting calendar event', async () => {
@@ -268,7 +361,7 @@ void test('cleanupMissingTimelinkEventProperties skips linked events that still 
 	assert.match(markdownByPath['Boards/Main.md'], /\[\[Cards\/Task\|Task\]\]/);
 });
 
-void test('cleanupMissingTimelinkEventProperties deletes property-less event inside configured calendar folder', async () => {
+void test('cleanupMissingTimelinkEventProperties preserves unlinked property-less notes', async () => {
 	const markdownByPath = {
 		'Custom-Calendar/Broken.md': '2026-05-19 broken event\n',
 		'Other/Broken.md': 'not a calendar event\n',
@@ -279,9 +372,296 @@ void test('cleanupMissingTimelinkEventProperties deletes property-less event ins
 	};
 	const { app, trashCalls } = createMockApp({ frontmatterByPath, markdownByPath });
 
-	const result = await runCleanup(app as never, 'Custom-Calendar');
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.brokenEventLinks, 0);
+	assert.strictEqual(result.eventsDeleted, 0);
+	assert.deepEqual(trashCalls, []);
+});
+
+void test('cleanupMissingTimelinkEventProperties preserves a card note edited after discovery', async () => {
+	const initialCardMarkdown = [
+		'---',
+		`${TIMELINK_EVENT_KEY}: "[[Events/Missing.md]]"`,
+		'---',
+		'',
+	].join('\n');
+	const editedCardMarkdown = `${initialCardMarkdown}\n# User edit\n`;
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': initialCardMarkdown,
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Missing.md]]' },
+	};
+	const { app, trashCalls, modifyCalls } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+		freshMarkdownByPath: { 'Cards/Task.md': editedCardMarkdown },
+	});
+
+	const result = await runCleanup(app as never);
 
 	assert.strictEqual(result.brokenEventLinks, 1);
-	assert.strictEqual(result.eventsDeleted, 1);
-	assert.deepEqual(trashCalls, ['Custom-Calendar/Broken.md']);
+	assert.strictEqual(result.cardNotesDeleted, 0);
+	assert.strictEqual(result.cardEventLinksRemoved, 0);
+	assert.strictEqual(result.kanbanCardLinksCleared, 0);
+	assert.deepEqual(trashCalls, []);
+	assert.deepEqual(modifyCalls, []);
+	assert.strictEqual(markdownByPath['Cards/Task.md'], editedCardMarkdown);
+	assert.strictEqual(
+		frontmatterByPath['Cards/Task.md']?.[TIMELINK_EVENT_KEY],
+		'[[Events/Missing.md]]',
+	);
+});
+
+void test('cleanupMissingTimelinkEventProperties preserves a freshly relinked empty card note', async () => {
+	const initialCardMarkdown = [
+		'---',
+		`${TIMELINK_EVENT_KEY}: "[[Events/Missing.md]]"`,
+		'---',
+		'',
+	].join('\n');
+	const relinkedCardMarkdown = [
+		'---',
+		`${TIMELINK_EVENT_KEY}: "[[Events/New.md]]"`,
+		'---',
+		'',
+	].join('\n');
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': initialCardMarkdown,
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Missing.md]]' },
+	};
+	const { app, trashCalls, modifyCalls } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+		freshMarkdownByPath: { 'Cards/Task.md': relinkedCardMarkdown },
+	});
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.cardNotesDeleted, 0);
+	assert.strictEqual(result.cardEventLinksRemoved, 0);
+	assert.strictEqual(result.kanbanCardLinksCleared, 0);
+	assert.deepEqual(trashCalls, []);
+	assert.deepEqual(modifyCalls, []);
+	assert.strictEqual(markdownByPath['Cards/Task.md'], relinkedCardMarkdown);
+});
+
+void test('cleanupMissingTimelinkEventProperties does not delete a card path removed after discovery', async () => {
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': ['---', `${TIMELINK_EVENT_KEY}: "[[Events/Missing.md]]"`, '---', ''].join(
+			'\n',
+		),
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Missing.md]]' },
+	};
+	const { app, trashCalls, modifyCalls } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+		missingAfterSnapshotPaths: ['Cards/Task.md'],
+	});
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.cardNotesDeleted, 0);
+	assert.strictEqual(result.cardEventLinksRemoved, 0);
+	assert.strictEqual(result.kanbanCardLinksCleared, 0);
+	assert.deepEqual(trashCalls, []);
+	assert.deepEqual(modifyCalls, []);
+});
+
+void test('cleanupMissingTimelinkEventProperties rechecks immediately before trashing a card note', async () => {
+	const initialCardMarkdown = [
+		'---',
+		`${TIMELINK_EVENT_KEY}: "[[Events/Missing.md]]"`,
+		'---',
+		'',
+	].join('\n');
+	const lastMomentEdit = `${initialCardMarkdown}\nkeep this last-moment edit\n`;
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': initialCardMarkdown,
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Missing.md]]' },
+	};
+	const { app, trashCalls, modifyCalls } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+		freshMarkdownSequenceByPath: {
+			'Cards/Task.md': [initialCardMarkdown, lastMomentEdit],
+		},
+	});
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.cardNotesDeleted, 0);
+	assert.strictEqual(result.kanbanCardLinksCleared, 0);
+	assert.deepEqual(trashCalls, []);
+	assert.deepEqual(modifyCalls, []);
+	assert.strictEqual(markdownByPath['Cards/Task.md'], lastMomentEdit);
+});
+
+void test('cleanupMissingTimelinkEventProperties preserves an event note edited after discovery', async () => {
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': [
+			'---',
+			`${TIMELINK_EVENT_KEY}: "[[Events/Broken.md]]"`,
+			'---',
+			'',
+			'# Saved card note',
+		].join('\n'),
+		'Events/Broken.md': '',
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Broken.md]]' },
+		'Events/Broken.md': undefined,
+	};
+	const { app, trashCalls } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+		freshMarkdownByPath: { 'Events/Broken.md': '# Last-moment event edit\n' },
+	});
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.eventsDeleted, 0);
+	assert.strictEqual(result.cardEventLinksRemoved, 1);
+	assert.deepEqual(trashCalls, []);
+	assert.strictEqual(markdownByPath['Events/Broken.md'], '# Last-moment event edit\n');
+});
+
+void test('cleanupMissingTimelinkEventProperties does not trash a replacement at an event path', async () => {
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': [
+			'---',
+			`${TIMELINK_EVENT_KEY}: "[[Events/Broken.md]]"`,
+			'---',
+			'',
+			'# Saved card note',
+		].join('\n'),
+		'Events/Broken.md': '',
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Broken.md]]' },
+		'Events/Broken.md': undefined,
+	};
+	const { app, trashCalls } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+		replaceAfterSnapshotPaths: ['Events/Broken.md'],
+	});
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.eventsDeleted, 0);
+	assert.strictEqual(result.cardEventLinksRemoved, 1);
+	assert.deepEqual(trashCalls, []);
+});
+
+void test('cleanupMissingTimelinkEventProperties does not overwrite a board edited after discovery', async () => {
+	const initialBoardMarkdown = createBoardMarkdown('[[Cards/Task|Task]]');
+	const editedBoardMarkdown = `${initialBoardMarkdown}\n## User edit\n`;
+	const markdownByPath = {
+		'Boards/Main.md': initialBoardMarkdown,
+		'Cards/Task.md': ['---', `${TIMELINK_EVENT_KEY}: "[[Events/Missing.md]]"`, '---', ''].join(
+			'\n',
+		),
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Missing.md]]' },
+	};
+	const { app, modifyCalls } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+		freshMarkdownByPath: { 'Boards/Main.md': editedBoardMarkdown },
+	});
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.cardNotesDeleted, 1);
+	assert.strictEqual(result.kanbanCardLinksCleared, 0);
+	assert.deepEqual(modifyCalls, []);
+	assert.strictEqual(markdownByPath['Boards/Main.md'], editedBoardMarkdown);
+});
+
+void test('cleanupMissingTimelinkEventProperties preserves a nonempty card note relinked after discovery', async () => {
+	const initialCardMarkdown = [
+		'---',
+		`${TIMELINK_EVENT_KEY}: "[[Events/Missing.md]]"`,
+		'---',
+		'',
+		'# Saved note',
+	].join('\n');
+	const relinkedCardMarkdown = initialCardMarkdown.replace('Events/Missing.md', 'Events/New.md');
+	const markdownByPath = {
+		'Boards/Main.md': createBoardMarkdown('[[Cards/Task|Task]]'),
+		'Cards/Task.md': initialCardMarkdown,
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Boards/Main.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Missing.md]]' },
+	};
+	const { app } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+		freshMarkdownByPath: { 'Cards/Task.md': relinkedCardMarkdown },
+	});
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.cardEventLinksRemoved, 0);
+	assert.strictEqual(markdownByPath['Cards/Task.md'], relinkedCardMarkdown);
+	assert.strictEqual(
+		frontmatterByPath['Cards/Task.md']?.[TIMELINK_EVENT_KEY],
+		'[[Events/Missing.md]]',
+	);
+});
+
+void test('cleanupMissingTimelinkEventProperties ignores a stale cached board marker', async () => {
+	const ordinaryMarkdown = [
+		'---',
+		'title: Ordinary note',
+		'---',
+		'',
+		'## Todo',
+		'',
+		'- [ ] [[Cards/Task|Task]]',
+	].join('\n');
+	const markdownByPath = {
+		'Notes/Ordinary.md': ordinaryMarkdown,
+		'Cards/Task.md': ['---', `${TIMELINK_EVENT_KEY}: "[[Events/Missing.md]]"`, '---', ''].join(
+			'\n',
+		),
+	};
+	const frontmatterByPath: Record<string, Record<string, unknown> | undefined> = {
+		'Notes/Ordinary.md': { 'kanban-plugin': 'board' },
+		'Cards/Task.md': { [TIMELINK_EVENT_KEY]: '[[Events/Missing.md]]' },
+	};
+	const { app, trashCalls, modifyCalls } = createMockApp({
+		frontmatterByPath,
+		markdownByPath,
+	});
+
+	const result = await runCleanup(app as never);
+
+	assert.strictEqual(result.brokenEventLinks, 0);
+	assert.deepEqual(trashCalls, []);
+	assert.deepEqual(modifyCalls, []);
+	assert.strictEqual(markdownByPath['Notes/Ordinary.md'], ordinaryMarkdown);
 });

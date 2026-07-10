@@ -47,6 +47,60 @@ void test('buildTimedPlacementsForDays expands cross-day timed event across mapp
 	);
 });
 
+void test('buildTimedPlacementsForDays infers overnight timed event without endDate', () => {
+	const segment = createSegment({ date: '2026-03-01', startTime: '23:00', endTime: '01:00' });
+	const placements = buildTimedPlacementsForDays({
+		days: [
+			{ dayKey: '2026-03-01', dayOffset: 0 },
+			{ dayKey: '2026-03-02', dayOffset: 1 },
+		],
+		segments: [segment],
+		timedResizing: null,
+		timedResizeRange: null,
+		timedDragging: null,
+		timedDragRange: null,
+	});
+
+	assert.deepEqual(
+		placements.map((placement) => ({
+			dayOffset: placement.dayOffset,
+			startMinutes: placement.startMinutes,
+			endMinutes: placement.endMinutes,
+		})),
+		[
+			{ dayOffset: 0, startMinutes: 23 * 60, endMinutes: 24 * 60 },
+			{ dayOffset: 1, startMinutes: 0, endMinutes: 60 },
+		],
+	);
+});
+
+void test('buildTimedPlacementsForDays keeps next-day midnight tail hidden', () => {
+	const segment = createSegment(
+		{ date: '2026-03-01', endDate: '2026-03-02', startTime: '23:00', endTime: '00:00' },
+		{ end: '2026-03-02', span: 2 },
+	);
+	const placements = buildTimedPlacementsForDays({
+		days: [
+			{ dayKey: '2026-03-01', dayOffset: 0 },
+			{ dayKey: '2026-03-02', dayOffset: 1 },
+		],
+		segments: [segment],
+		timedResizing: null,
+		timedResizeRange: null,
+		timedDragging: null,
+		timedDragRange: null,
+	});
+
+	assert.deepEqual(
+		placements.map((placement) => ({
+			dayOffset: placement.dayOffset,
+			startMinutes: placement.startMinutes,
+			endMinutes: placement.endMinutes,
+		})),
+		[{ dayOffset: 0, startMinutes: 23 * 60, endMinutes: 24 * 60 }],
+	);
+});
+
 void test('deriveNowIndicator returns today index and nowTop using slot geometry', () => {
 	const dates = [new Date(2026, 2, 1), new Date(2026, 2, 2), new Date(2026, 2, 3)];
 	const targetDate = dates[1];

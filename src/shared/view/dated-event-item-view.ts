@@ -24,7 +24,7 @@ export abstract class DatedEventItemView<Resource> extends MountedItemView {
 		containerEl: HTMLElement,
 		app: App,
 		calendar: Resource,
-		onOpenNote: (path: string) => void,
+		onOpenNote: (path: string) => Promise<void> | void,
 	): void;
 	protected abstract unmountDatedView(containerEl: HTMLElement): void;
 
@@ -38,9 +38,9 @@ export abstract class DatedEventItemView<Resource> extends MountedItemView {
 			containerEl.createEl('div', { text: this.getNotReadyText() });
 			return;
 		}
-		this.mountDatedView(containerEl, this.plugin.app, calendar, (path: string) => {
-			void this.openNote(path);
-		});
+		this.mountDatedView(containerEl, this.plugin.app, calendar, (path: string) =>
+			this.openNote(path),
+		);
 	}
 
 	protected unmountMountedView(containerEl: HTMLElement): void {

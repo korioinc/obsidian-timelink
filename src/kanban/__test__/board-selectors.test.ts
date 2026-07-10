@@ -1,6 +1,5 @@
 import {
-	buildCardEventMap,
-	buildCardTitleMap,
+	buildCardDerivedState,
 	findCardBlockId,
 	findCardById,
 	hasCard,
@@ -15,19 +14,15 @@ function createBoard(): KanbanBoard {
 			{
 				id: 'lane-a',
 				title: 'Todo',
-				lineStart: 0,
-				lineEnd: 0,
 				cards: [
-					{ id: 'card-1', title: 'First card', lineStart: 0, blockId: 'block-1' },
-					{ id: 'card-2', title: 'Second card', lineStart: 1 },
+					{ id: 'card-1', title: 'First card', blockId: 'block-1' },
+					{ id: 'card-2', title: 'Second card' },
 				],
 			},
 			{
 				id: 'lane-b',
 				title: 'Done',
-				lineStart: 0,
-				lineEnd: 0,
-				cards: [{ id: 'card-3', title: 'Done card', lineStart: 0, blockId: 'block-3' }],
+				cards: [{ id: 'card-3', title: 'Done card', blockId: 'block-3' }],
 			},
 		],
 	};
@@ -58,15 +53,23 @@ void test('hasCard returns true only when card exists', () => {
 	assert.strictEqual(hasCard(board, 'missing-card'), false);
 });
 
-void test('buildCardTitleMap indexes card titles by id', () => {
-	const titles = buildCardTitleMap(createBoard());
-	assert.strictEqual(titles.get('card-1'), 'First card');
-	assert.strictEqual(titles.get('card-3'), 'Done card');
-	assert.strictEqual(titles.get('missing'), undefined);
-});
+void test('buildCardDerivedState resolves each card link once while building all indexes', () => {
+	const resolvedTitles: string[] = [];
+	const derivedState = buildCardDerivedState(createBoard(), (title) => {
+		resolvedTitles.push(title);
+		if (title === 'Second card') return null;
+		return {
+			path: `Cards/${title}.md`,
+			hasEvent: title === 'Done card',
+		};
+	});
 
-void test('buildCardEventMap delegates per-card event check and stores booleans', () => {
-	const eventMap = buildCardEventMap(createBoard(), (title) => title.includes('Done'));
-	assert.strictEqual(eventMap.get('card-1'), false);
-	assert.strictEqual(eventMap.get('card-3'), true);
+	assert.deepEqual([...resolvedTitles].sort(), ['Done card', 'First card', 'Second card']);
+	assert.strictEqual(derivedState.titleById.get('card-1'), 'First card');
+	assert.strictEqual(derivedState.hasEventById.get('card-1'), false);
+	assert.strictEqual(derivedState.hasEventById.get('card-3'), true);
+	assert.deepEqual(Array.from(derivedState.linkedPaths).sort(), [
+		'Cards/Done card.md',
+		'Cards/First card.md',
+	]);
 });

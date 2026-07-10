@@ -1,3 +1,4 @@
+import { createNotice } from '../../shared/services/notice-service';
 import type { KanbanRootActionHandlers } from '../types';
 import type { CrossBoardCardMovePayload } from '../utils/card-dnd';
 import { buildCardTitleWithPrimaryLink } from '../utils/card-title';
@@ -20,11 +21,39 @@ import {
 	updateLaneTitle,
 } from './model-service';
 import type {
+	BoardMutation,
 	KanbanViewCardActionsServiceContext,
 	KanbanViewCrossBoardServiceContext,
 	KanbanViewServiceContext,
 } from './view-service-context';
-import { Notice } from 'obsidian';
+
+const notice = createNotice();
+
+const applyConfirmedBoardMutation = async (
+	context: Pick<KanbanViewServiceContext, 'applyBoardMutation'>,
+	mutate: BoardMutation,
+): Promise<true> => {
+	const updated = await context.applyBoardMutation(mutate);
+	if (!updated) {
+		throw new Error('Board mutation was not applied.');
+	}
+	return true;
+};
+
+const runReportedAction = async (
+	label: string,
+	failureMessage: string,
+	action: () => Promise<unknown>,
+	options: { rethrow?: boolean } = {},
+): Promise<void> => {
+	try {
+		await action();
+	} catch (error) {
+		console.error(label, error);
+		notice(failureMessage);
+		if (options.rethrow) throw error;
+	}
+};
 
 const updateCardTitleWithLink = async (
 	context: KanbanViewCardActionsServiceContext,
@@ -33,7 +62,7 @@ const updateCardTitleWithLink = async (
 	originalTitle: string,
 ): Promise<void> => {
 	const nextTitle = buildCardTitleWithPrimaryLink(link, originalTitle);
-	await context.applyBoardMutation((board) => updateCardTitle(board, cardId, nextTitle));
+	await applyConfirmedBoardMutation(context, (board) => updateCardTitle(board, cardId, nextTitle));
 };
 
 const ensureCardBlockId = async (
@@ -45,7 +74,9 @@ const ensureCardBlockId = async (
 	const existing = findCardBlockId(board, cardId);
 	if (existing) return existing;
 	const nextId = generateBlockId();
-	await context.applyBoardMutation((nextBoard) => updateCardBlockId(nextBoard, cardId, nextId));
+	await applyConfirmedBoardMutation(context, (nextBoard) =>
+		updateCardBlockId(nextBoard, cardId, nextId),
+	);
 	return nextId;
 };
 
@@ -64,12 +95,15 @@ const createCardActionContext = (
 		eventCardProperty: context.eventCardProperty,
 		getCardTitle: context.getCardTitle,
 		ensureCardBlockId: (cardId) => ensureCardBlockId(context, cardId),
+		notice: (message) => {
+			notice(message);
+		},
 		updateCardTitleWithLink: (cardId, link, originalTitle) =>
 			updateCardTitleWithLink(context, cardId, link, originalTitle),
 	};
 };
 
-export const handleCreateNoteFromCard = async (
+const handleCreateNoteFromCard = async (
 	context: KanbanViewCardActionsServiceContext,
 	cardId: string,
 ): Promise<void> => {
@@ -78,7 +112,7 @@ export const handleCreateNoteFromCard = async (
 	await createNoteFromCard(actionContext, cardId);
 };
 
-export const handleCreateEventFromCard = async (
+const handleCreateEventFromCard = async (
 	context: KanbanViewCardActionsServiceContext,
 	cardId: string,
 ): Promise<void> => {
@@ -87,7 +121,7 @@ export const handleCreateEventFromCard = async (
 	await createEventFromCard(actionContext, cardId);
 };
 
-export const handleCopyCardLink = async (
+const handleCopyCardLink = async (
 	context: KanbanViewCardActionsServiceContext,
 	cardId: string,
 ): Promise<void> => {
@@ -106,16 +140,16 @@ export const removeCardForExternalMove = async (
 	return context.applyBoardMutation((nextBoard) => removeCard(nextBoard, cardId));
 };
 
-export const handleMoveCard = async (
+const handleMoveCard = async (
 	context: KanbanViewCrossBoardServiceContext,
 	cardId: string,
 	laneId: string,
 	index: number,
 ): Promise<void> => {
-	await context.applyBoardMutation((board) => moveCard(board, cardId, laneId, index));
+	await applyConfirmedBoardMutation(context, (board) => moveCard(board, cardId, laneId, index));
 };
 
-export const handleMoveCardFromOtherBoard = async (
+const handleMoveCardFromOtherBoard = async (
 	context: KanbanViewCrossBoardServiceContext,
 	payload: CrossBoardCardMovePayload,
 	laneId: string,
@@ -132,16 +166,24 @@ export const handleMoveCardFromOtherBoard = async (
 	const normalizedTitle = payload.title.replace(/\r\n/g, '\n').trim();
 	if (!normalizedTitle) return;
 
-	await context.applyBoardMutation((nextBoard) =>
+	await applyConfirmedBoardMutation(context, (nextBoard) =>
 		insertCardAt(nextBoard, laneId, index, {
 			title: normalizedTitle,
 			blockId: payload.blockId,
 		}),
 	);
 
-	const removed = await context.removeCardFromSourceBoard(payload.sourceBoardPath, payload.cardId);
+	let removed: boolean;
+	try {
+		removed = await context.removeCardFromSourceBoard(payload.sourceBoardPath, payload.cardId);
+	} catch (error) {
+		console.error('Failed to remove source card after cross-board move', error);
+		notice('Card moved, but source card removal failed. Remove it manually if duplicated.');
+		return;
+	}
 	if (!removed) {
-		new Notice('Card moved, but source card removal failed. Remove it manually if duplicated.');
+		console.error('Failed to remove source card after cross-board move');
+		notice('Card moved, but source card removal failed. Remove it manually if duplicated.');
 	}
 };
 
@@ -150,56 +192,84 @@ export const buildKanbanRootActionHandlers = (
 	closeAddLaneForm: () => void,
 ): KanbanRootActionHandlers => ({
 	onCloseAddLaneForm: closeAddLaneForm,
-	onAddLane: async (title: string) => {
-		await context.applyBoardMutation((board) => addLane(board, title));
-	},
+	onAddLane: (title: string) =>
+		runReportedAction(
+			'Failed to add kanban list',
+			'Failed to add list.',
+			() => applyConfirmedBoardMutation(context, (board) => addLane(board, title)),
+			{ rethrow: true },
+		),
 	onCreateNoteFromCard: (cardId: string) => {
-		void handleCreateNoteFromCard(context, cardId);
+		void runReportedAction(
+			'Failed to create note from card',
+			'Failed to create note from card.',
+			() => handleCreateNoteFromCard(context, cardId),
+		);
 	},
 	onCopyCardLink: (cardId: string) => {
-		void handleCopyCardLink(context, cardId);
-	},
-	onCreateEventFromCard: (cardId: string) => {
-		void handleCreateEventFromCard(context, cardId);
-	},
-	onRemoveLane: async (laneId: string) => {
-		await context.applyBoardMutation((board) => removeLane(board, laneId));
-	},
-	onReorderLanes: async (order: string[]) => {
-		await context.applyBoardMutation((board) => reorderLanesByOrder(board, order));
-	},
-	onAddCard: async (laneId: string, title: string) => {
-		await context.applyBoardMutation((board) => addCard(board, laneId, title));
-	},
-	onUpdateLaneTitle: async (laneId: string, title: string) => {
-		await context.applyBoardMutation((board) => updateLaneTitle(board, laneId, title));
-	},
-	onRemoveCard: async (cardId: string, options) => {
-		await removeCardWithLinkedCleanup({
-			app: context.app,
-			board: context.getBoard(),
-			sourceFile: context.getFile(),
-			cardId,
-			options,
-			calendar: context.calendar,
-			applyBoardMutation: context.applyBoardMutation,
-			cardEventProperty: context.cardEventProperty,
-			notice: (message: string) => {
-				new Notice(message);
-			},
+		void runReportedAction('Failed to copy card link', 'Failed to copy card link.', async () => {
+			await handleCopyCardLink(context, cardId);
+			notice('Card link copied to clipboard.');
 		});
 	},
-	onUpdateCardTitle: async (cardId: string, title: string) => {
-		await context.applyBoardMutation((board) => updateCardTitle(board, cardId, title));
+	onCreateEventFromCard: (cardId: string) => {
+		void runReportedAction(
+			'Failed to create event from card',
+			'Failed to create event from card.',
+			() => handleCreateEventFromCard(context, cardId),
+		);
 	},
-	onMoveCard: async (cardId: string, laneId: string, index: number) => {
-		await handleMoveCard(context, cardId, laneId, index);
-	},
-	onMoveCardFromOtherBoard: async (
-		payload: CrossBoardCardMovePayload,
-		laneId: string,
-		index: number,
-	) => {
-		await handleMoveCardFromOtherBoard(context, payload, laneId, index);
-	},
+	onRemoveLane: (laneId: string) =>
+		runReportedAction('Failed to remove kanban list', 'Failed to remove list.', () =>
+			applyConfirmedBoardMutation(context, (board) => removeLane(board, laneId)),
+		),
+	onReorderLanes: (order: string[]) =>
+		runReportedAction('Failed to reorder kanban lists', 'Failed to reorder lists.', () =>
+			applyConfirmedBoardMutation(context, (board) => reorderLanesByOrder(board, order)),
+		),
+	onAddCard: (laneId: string, title: string) =>
+		runReportedAction(
+			'Failed to add kanban card',
+			'Failed to add card.',
+			() => applyConfirmedBoardMutation(context, (board) => addCard(board, laneId, title)),
+			{ rethrow: true },
+		),
+	onUpdateLaneTitle: (laneId: string, title: string) =>
+		runReportedAction(
+			'Failed to update kanban list',
+			'Failed to update list.',
+			() => applyConfirmedBoardMutation(context, (board) => updateLaneTitle(board, laneId, title)),
+			{ rethrow: true },
+		),
+	onRemoveCard: (cardId: string, options) =>
+		runReportedAction('Failed to remove kanban card', 'Failed to remove card.', () =>
+			removeCardWithLinkedCleanup({
+				app: context.app,
+				board: context.getBoard(),
+				sourceFile: context.getFile(),
+				cardId,
+				options,
+				calendar: context.calendar,
+				applyBoardMutation: (mutate) => applyConfirmedBoardMutation(context, mutate),
+				cardEventProperty: context.cardEventProperty,
+				notice: (message: string) => {
+					notice(message);
+				},
+			}),
+		),
+	onUpdateCardTitle: (cardId: string, title: string) =>
+		runReportedAction(
+			'Failed to update kanban card',
+			'Failed to update card.',
+			() => applyConfirmedBoardMutation(context, (board) => updateCardTitle(board, cardId, title)),
+			{ rethrow: true },
+		),
+	onMoveCard: (cardId: string, laneId: string, index: number) =>
+		runReportedAction('Failed to move kanban card', 'Failed to move card.', () =>
+			handleMoveCard(context, cardId, laneId, index),
+		),
+	onMoveCardFromOtherBoard: (payload: CrossBoardCardMovePayload, laneId: string, index: number) =>
+		runReportedAction('Failed to move kanban card', 'Failed to move card.', () =>
+			handleMoveCardFromOtherBoard(context, payload, laneId, index),
+		),
 });

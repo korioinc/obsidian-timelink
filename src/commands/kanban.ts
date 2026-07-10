@@ -1,6 +1,12 @@
+import {
+	inspectKanbanBoardFile,
+	readCachedKanbanMarker,
+	resolveKanbanOpenDecision,
+} from '../kanban/services/board-open-policy';
 import { KanbanView } from '../kanban/view';
 import { openCreateKanbanModal } from '../kanban/view/modal';
 import type TimeLinkPlugin from '../main';
+import { canOfferOpenActiveKanbanBoard } from './kanban-command-policy';
 import { Notice, TFile } from 'obsidian';
 
 function getActiveKanbanView(plugin: TimeLinkPlugin): KanbanView | null {
@@ -13,6 +19,37 @@ function getActiveKanbanView(plugin: TimeLinkPlugin): KanbanView | null {
 	const leaves = plugin.app.workspace.getLeavesOfType('timelink-kanban');
 	const leafView = leaves[0]?.view;
 	return leafView instanceof KanbanView ? leafView : null;
+}
+
+async function inspectAndOpenActiveBoard(
+	plugin: TimeLinkPlugin,
+	file: TFile,
+	requiresInspection: boolean,
+): Promise<void> {
+	if (requiresInspection) {
+		let isKanban: boolean;
+		try {
+			const cachedMarker = readCachedKanbanMarker(plugin.app.metadataCache.getFileCache(file));
+			isKanban = await inspectKanbanBoardFile(file.extension, cachedMarker, () =>
+				plugin.app.vault.cachedRead(file),
+			);
+		} catch (error) {
+			console.error('Failed to inspect active kanban board', error);
+			new Notice('Failed to inspect the active file.');
+			return;
+		}
+		if (!isKanban) {
+			new Notice('The active file is not a kanban board.');
+			return;
+		}
+	}
+
+	try {
+		await plugin.kanbanManager.openBoard(file);
+	} catch (error) {
+		console.error('Failed to open active kanban board', error);
+		new Notice('Failed to open the kanban board.');
+	}
 }
 
 export function registerKanbanCommands(plugin: TimeLinkPlugin): void {
@@ -35,9 +72,11 @@ export function registerKanbanCommands(plugin: TimeLinkPlugin): void {
 			if (!plugin.settings.enableKanban) return false;
 			const file = plugin.app.workspace.getActiveFile();
 			if (!(file instanceof TFile)) return false;
-			if (!file.path.endsWith('.md')) return false;
+			const cachedMarker = readCachedKanbanMarker(plugin.app.metadataCache.getFileCache(file));
+			const decision = resolveKanbanOpenDecision(file.extension, cachedMarker);
+			if (!canOfferOpenActiveKanbanBoard(decision)) return false;
 			if (checking) return true;
-			void plugin.kanbanManager.openBoard(file);
+			void inspectAndOpenActiveBoard(plugin, file, decision === 'inspect');
 			return true;
 		},
 	});

@@ -71,8 +71,22 @@ class DeleteEventConfirmationModal extends Modal {
 export function requestDeleteEventConfirmation(
 	app: App,
 	location: EventLocation,
+	signal?: AbortSignal,
 ): Promise<DeleteEventConfirmationResult> {
 	return new Promise((resolve) => {
-		new DeleteEventConfirmationModal(app, hasLinkedNote(app, location), resolve).open();
+		const abortResult = { approved: false, deleteLinkedNote: false };
+		let modal: DeleteEventConfirmationModal | null = null;
+		const handleAbort = () => modal?.close();
+		const finish: DeleteEventConfirmationResolver = (result) => {
+			signal?.removeEventListener('abort', handleAbort);
+			resolve(result);
+		};
+		if (signal?.aborted) {
+			finish(abortResult);
+			return;
+		}
+		modal = new DeleteEventConfirmationModal(app, hasLinkedNote(app, location), finish);
+		signal?.addEventListener('abort', handleAbort, { once: true });
+		modal.open();
 	});
 }

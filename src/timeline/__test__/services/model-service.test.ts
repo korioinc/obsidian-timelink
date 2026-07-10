@@ -93,3 +93,73 @@ void test('buildTimelineTimedVisualModel derives timed placements and now indica
 	assert.strictEqual(visuals.showNowIndicator, true);
 	assert.strictEqual(visuals.nowTop, 798);
 });
+
+void test('buildTimelineTimedVisualModel renders overnight timed event without endDate on both days', () => {
+	const entries: EditableEventResponse[] = [
+		createEntry(
+			{
+				title: 'expo conf',
+				date: '2026-06-12',
+				startTime: '20:00',
+				endTime: '01:01',
+			},
+			'calendar/2026-06-12 expo conf.md',
+		),
+	];
+
+	const startDayModel = buildTimelineDayModel(entries, new Date(2026, 5, 12));
+	const startDayVisuals = buildTimelineTimedVisualModel({
+		eventSegments: startDayModel.eventSegments,
+		dayKey: startDayModel.dayKey,
+		dayDate: startDayModel.dayCell.date,
+		timedResizing: null,
+		timedResizeRange: null,
+		timedDragging: null,
+		timedDragRange: null,
+		now: new Date(2026, 5, 12, 19, 0),
+		slotMinutes: TIMELINE_SLOT_MINUTES,
+		slotHeight: TIMELINE_SLOT_HEIGHT,
+	});
+
+	assert.deepEqual(
+		startDayModel.eventSegments.map((segment) => segment.event.title),
+		['expo conf'],
+	);
+	assert.strictEqual(startDayModel.eventSegments[0]?.event.endDate, undefined);
+	assert.strictEqual(startDayModel.unscheduledTasks.length, 0);
+	assert.deepEqual(
+		startDayVisuals.timedEventsForDay.map((placement) => ({
+			startMinutes: placement.startMinutes,
+			endMinutes: placement.endMinutes,
+		})),
+		[{ startMinutes: 20 * 60, endMinutes: 24 * 60 }],
+	);
+
+	const nextDayModel = buildTimelineDayModel(entries, new Date(2026, 5, 13));
+	const nextDayVisuals = buildTimelineTimedVisualModel({
+		eventSegments: nextDayModel.eventSegments,
+		dayKey: nextDayModel.dayKey,
+		dayDate: nextDayModel.dayCell.date,
+		timedResizing: null,
+		timedResizeRange: null,
+		timedDragging: null,
+		timedDragRange: null,
+		now: new Date(2026, 5, 13, 0, 30),
+		slotMinutes: TIMELINE_SLOT_MINUTES,
+		slotHeight: TIMELINE_SLOT_HEIGHT,
+	});
+
+	assert.deepEqual(
+		nextDayModel.eventSegments.map((segment) => segment.event.title),
+		['expo conf'],
+	);
+	assert.strictEqual(nextDayModel.eventSegments[0]?.event.endDate, undefined);
+	assert.strictEqual(nextDayModel.unscheduledTasks.length, 0);
+	assert.deepEqual(
+		nextDayVisuals.timedEventsForDay.map((placement) => ({
+			startMinutes: placement.startMinutes,
+			endMinutes: placement.endMinutes,
+		})),
+		[{ startMinutes: 0, endMinutes: 61 }],
+	);
+});

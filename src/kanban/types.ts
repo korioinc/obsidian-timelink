@@ -12,15 +12,12 @@ export interface KanbanBoardSettings extends Partial<Record<BoardVisibilitySetti
 export interface KanbanCard {
 	id: string;
 	title: string;
-	lineStart: number;
 	blockId?: string;
 }
 
 export interface KanbanLane {
 	id: string;
 	title: string;
-	lineStart: number;
-	lineEnd: number;
 	cards: KanbanCard[];
 }
 

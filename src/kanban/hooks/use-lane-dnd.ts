@@ -132,7 +132,7 @@ export function useObsidianLinkDrop({
 		const laneEl = laneRef.current;
 		if (!laneEl) return;
 
-		const dropTarget = listEl ?? laneEl;
+		const dropTarget: HTMLElement = listEl ?? laneEl;
 		const handleDragOver = (event: DragEvent) => {
 			const links = resolveDroppedObsidianLinks({ app, sourcePath, isInteractionLocked });
 			if (!links) return;
@@ -147,7 +147,7 @@ export function useObsidianLinkDrop({
 			if (!links) return;
 			event.preventDefault();
 			links.forEach((link) => {
-				void onAddCard(laneId, link);
+				void onAddCard(laneId, link).catch(() => undefined);
 			});
 		};
 

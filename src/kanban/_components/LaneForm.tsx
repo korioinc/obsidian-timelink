@@ -6,6 +6,36 @@ type AddLaneFormProps = {
 	onCancel: () => void;
 };
 
+type SubmitLaneFormOptions = AddLaneFormProps & {
+	title: string;
+	isSubmitting: boolean;
+	setTitle: (title: string) => void;
+	setIsSubmitting: (isSubmitting: boolean) => void;
+};
+
+export const submitLaneForm = async ({
+	title,
+	isSubmitting,
+	setTitle,
+	setIsSubmitting,
+	onSubmit,
+	onCancel,
+}: SubmitLaneFormOptions): Promise<void> => {
+	if (isSubmitting) return;
+	const trimmed = title.trim();
+	if (!trimmed) return;
+	setIsSubmitting(true);
+	try {
+		await onSubmit(trimmed);
+		setTitle('');
+	} catch {
+		return;
+	} finally {
+		setIsSubmitting(false);
+	}
+	onCancel();
+};
+
 export function AddLaneForm({ onSubmit, onCancel }: AddLaneFormProps): h.JSX.Element {
 	const [title, setTitle] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,14 +64,14 @@ export function AddLaneForm({ onSubmit, onCancel }: AddLaneFormProps): h.JSX.Ele
 	}, [onCancel]);
 
 	const submit = async () => {
-		if (isSubmitting) return;
-		const trimmed = title.trim();
-		if (!trimmed) return;
-		setIsSubmitting(true);
-		await onSubmit(trimmed);
-		setTitle('');
-		setIsSubmitting(false);
-		onCancel();
+		await submitLaneForm({
+			title,
+			isSubmitting,
+			setTitle,
+			setIsSubmitting,
+			onSubmit,
+			onCancel,
+		});
 	};
 
 	return (

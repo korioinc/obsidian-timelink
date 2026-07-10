@@ -1,4 +1,4 @@
-import { toMinutes } from './model-utils';
+import { resolveEffectiveTimedEventRange, toMinutes } from './model-utils';
 import { resolveTimedDragHoverState } from './time-grid-interactions';
 import type { EventSegment, TimedDragAnchor } from './types';
 
@@ -14,11 +14,22 @@ type TimedDragStartState = {
 	color: string | null;
 };
 
-export const deriveTimedResizeStartState = (segment: EventSegment): TimedResizeStartState => ({
-	hoverDateKey: segment.end,
-	hoverMinutes: toMinutes(segment.event.endTime) ?? null,
-	color: segment.event.color ?? null,
-});
+const resolveTimedResizeEndBoundary = (segment: EventSegment) => {
+	const range = resolveEffectiveTimedEventRange(segment.event);
+	return {
+		dateKey: range && range.endKey !== range.startKey ? range.endKey : segment.end,
+		minutes: range?.endMinutes ?? toMinutes(segment.event.endTime) ?? null,
+	};
+};
+
+export const deriveTimedResizeStartState = (segment: EventSegment): TimedResizeStartState => {
+	const endBoundary = resolveTimedResizeEndBoundary(segment);
+	return {
+		hoverDateKey: endBoundary.dateKey,
+		hoverMinutes: endBoundary.minutes,
+		color: segment.event.color ?? null,
+	};
+};
 
 export const deriveTimedDragStartState = (
 	segment: EventSegment,

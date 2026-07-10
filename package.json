@@ -1,13 +1,15 @@
 {
 	"name": "obsidian-timelink",
-	"version": "1.0.0",
+	"version": "0.0.0",
+	"private": true,
 	"description": "Kanban board, calendar, and timeline views with linked event notes for Obsidian.",
 	"main": "main.js",
 	"type": "module",
 	"scripts": {
 		"dev": "concurrently -k \"node esbuild.config.mjs\" \"node build-tailwind.mjs watch\"",
-		"build": "node build-tailwind.mjs production && tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"version": "node version-bump.mjs && git add manifest.json versions.json",
+		"build": "node build-tailwind.mjs production && tsc && node esbuild.config.mjs production",
+		"sync:release-metadata": "node release-metadata.mjs sync",
+		"check:release-metadata": "node release-metadata.mjs check",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write .",
@@ -23,8 +25,8 @@
 	],
 	"license": "0-BSD",
 	"engines": {
-		"node": ">=20 <26",
-		"npm": ">=10 <11"
+		"node": ">=20",
+		"npm": ">=10"
 	},
 	"devDependencies": {
 		"@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
@@ -33,31 +35,26 @@
 		"@tailwindcss/cli": "^4.3.0",
 		"@trivago/prettier-plugin-sort-imports": "^6.0.2",
 		"@types/node": "^20.19.42",
-		"@typescript-eslint/eslint-plugin": "^8.61.0",
 		"@typescript-eslint/parser": "^8.61.0",
-		"concurrently": "^9.2.1",
+		"concurrently": "^9.2.3",
 		"esbuild": "0.25.5",
+		"eslint": "^9.30.1",
 		"eslint-config-prettier": "^9.1.2",
 		"eslint-plugin-obsidianmd": "0.3.0",
 		"eslint-plugin-prettier": "^5.5.6",
-		"eslint-plugin-promise": "^7.3.0",
 		"globals": "14.0.0",
-		"jiti": "2.6.1",
 		"prettier": "^3.8.3",
 		"prettier-plugin-tailwindcss": "^0.7.4",
 		"tailwindcss": "^4.3.0",
-		"tslib": "2.4.0",
-		"tsx": "^4.22.4",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.61.0",
-		"vitest": "^3.2.6"
+		"vitest": "^3.2.7"
 	},
 	"dependencies": {
 		"@atlaskit/pragmatic-drag-and-drop": "^1.8.1",
 		"@codemirror/state": "6.5.0",
 		"@codemirror/view": "6.38.6",
 		"obsidian": "latest",
-		"preact": "^10.29.2",
-		"rrule": "^2.8.1"
+		"preact": "^10.29.2"
 	}
 }

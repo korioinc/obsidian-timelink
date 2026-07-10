@@ -1,5 +1,12 @@
 import { normalizeHexColor } from '../color/normalize-hex-color';
-import { addDays, compareDateKey, formatDateKey, parseDateKey, toMinutes } from './model-utils';
+import {
+	addDays,
+	compareDateKey,
+	formatDateKey,
+	parseDateKey,
+	resolveEffectiveTimedEventRange,
+	toMinutes,
+} from './model-utils';
 import type {
 	CalendarEvent,
 	CreateEventState,
@@ -40,6 +47,22 @@ const normalizeEventEndDate = (startDate: string, endDate?: string | null): stri
 	if (!endDate) return undefined;
 	const normalized = compareDateKey(endDate, startDate) < 0 ? startDate : endDate;
 	return normalized === startDate ? undefined : normalized;
+};
+
+const normalizeDraftEndDate = (
+	draft: Pick<EventDraft, 'allDay' | 'date' | 'startTime' | 'endTime'>,
+	endDate?: string | null,
+): string | undefined => {
+	const normalizedEndDate = normalizeEventEndDate(draft.date, endDate);
+	if (draft.allDay) return normalizedEndDate;
+	const range = resolveEffectiveTimedEventRange({
+		allDay: draft.allDay,
+		date: draft.date,
+		endDate: normalizedEndDate,
+		startTime: draft.startTime,
+		endTime: draft.endTime,
+	});
+	return range && range.endKey !== range.startKey ? range.endKey : undefined;
 };
 
 const validateEventDraft = (draft: EventDraft): string | null => {
@@ -94,7 +117,7 @@ const buildEventModalState = (segment: EventSegment): EventModalState => {
 		normalizedEvent === segment.event ? segment : { ...segment, event: normalizedEvent };
 	return {
 		segment: normalizedSegment,
-		date: segment.start,
+		date: normalizedEvent.date ?? segment.start,
 		title: normalizedEvent.title,
 		allDay: normalizedEvent.allDay,
 		taskEvent: normalizedEvent.taskEvent ?? false,
@@ -224,7 +247,7 @@ export const handleModalSaveFactory = (
 		const previous: EditableEventResponse = [modal.segment.event, modal.segment.location];
 		const completed = draft.taskEvent ? draft.isCompleted : false;
 		const normalizedColor = normalizeHexColor(draft.color);
-		const normalizedEndDate = normalizeEventEndDate(draft.date, modal.segment.event.endDate);
+		const normalizedEndDate = normalizeDraftEndDate(draft, modal.segment.event.endDate);
 		const nextEvent: CalendarEvent = {
 			...modal.segment.event,
 			title: draft.title,
@@ -258,7 +281,7 @@ export const handleCreateSaveFactory = (
 			return;
 		}
 		const normalizedColor = normalizeHexColor(draft.color);
-		const normalizedEndDate = normalizeEventEndDate(draft.date, createModal.endDate);
+		const normalizedEndDate = normalizeDraftEndDate(draft, createModal.endDate);
 		const nextEvent: CalendarEvent = {
 			title: draft.title,
 			allDay: draft.allDay,

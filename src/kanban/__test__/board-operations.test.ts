@@ -20,18 +20,14 @@ function createBoard(): KanbanBoard {
 			{
 				id: 'lane-a',
 				title: 'Todo',
-				lineStart: 0,
-				lineEnd: 0,
 				cards: [
-					{ id: 'card-1', title: 'First', lineStart: 0 },
-					{ id: 'card-2', title: 'Second', lineStart: 1 },
+					{ id: 'card-1', title: 'First' },
+					{ id: 'card-2', title: 'Second' },
 				],
 			},
 			{
 				id: 'lane-b',
 				title: 'Done',
-				lineStart: 0,
-				lineEnd: 0,
 				cards: [],
 			},
 		],
@@ -56,6 +52,14 @@ void test('moveCard relocates card across lanes at clamped index', () => {
 		next.lanes[1]?.cards.map((card) => card.id),
 		['card-2'],
 	);
+});
+
+void test('moveCard preserves the board when the target lane does not exist', () => {
+	const board = createBoard();
+
+	const next = moveCard(board, 'card-2', 'missing-lane', 0);
+
+	assert.deepEqual(next, board);
 });
 
 void test('lane and card operations preserve behavior for add/update/remove', () => {

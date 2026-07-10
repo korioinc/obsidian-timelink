@@ -85,6 +85,135 @@ void test('handleDragStartFactory normalizes base dates and fallback hover key',
 	assert.strictEqual(didDropRef.current, false);
 });
 
+void test('handleDragStartFactory uses inferred overnight end date for timed events without endDate', () => {
+	let capturedStart: string | null = null;
+	let capturedEnd: string | null = null;
+	let capturedEndDate: string | null | undefined;
+	const didDropRef = { current: true };
+	const segment = createSegment(
+		{
+			allDay: false,
+			date: '2026-06-12',
+			startTime: '20:00',
+			endTime: '01:01',
+		},
+		{ start: '2026-06-12', end: '2026-06-12', span: 1 },
+	);
+
+	const handleDragStart = handleDragStartFactory(
+		(next) => {
+			capturedStart = next.start;
+			capturedEnd = next.end;
+			capturedEndDate = next.event.endDate;
+		},
+		() => undefined,
+		didDropRef,
+		() => null,
+	);
+
+	handleDragStart(
+		{
+			clientX: 200,
+			clientY: 100,
+			dataTransfer: null,
+			currentTarget: null,
+		} as DragEvent,
+		segment,
+	);
+
+	assert.strictEqual(capturedStart, '2026-06-12');
+	assert.strictEqual(capturedEnd, '2026-06-13');
+	assert.strictEqual(capturedEndDate, '2026-06-13');
+});
+
+void test('dragging a multi-day event preserves the grabbed-day offset', () => {
+	const segment = createSegment(
+		{ date: '2026-03-01', endDate: '2026-03-03' },
+		{ start: '2026-03-01', end: '2026-03-03', span: 3 },
+	);
+	let dragging: EventSegment | null = null;
+	let dragHoverDateKey: string | null = null;
+	let droppedTo: string | null = null;
+	const didDropRef = { current: false };
+	const popoverDragRef = { current: false };
+	const dragAnchorOffsetDaysRef = { current: 0 };
+
+	const handleDragStart = handleDragStartFactory(
+		(next) => {
+			dragging = next;
+		},
+		(next) => {
+			dragHoverDateKey = next;
+		},
+		didDropRef,
+		() => '2026-03-02',
+		dragAnchorOffsetDaysRef,
+	);
+	handleDragStart(
+		{
+			clientX: 200,
+			clientY: 100,
+			dataTransfer: null,
+			currentTarget: null,
+		} as DragEvent,
+		segment,
+	);
+
+	assert.strictEqual(dragAnchorOffsetDaysRef.current, 1);
+	assert.strictEqual(dragHoverDateKey, '2026-03-01');
+
+	const handleDragEnd = handleDragEndFactory(
+		() => dragging,
+		() => dragHoverDateKey,
+		(dateKey) => {
+			droppedTo = dateKey;
+		},
+		(next) => {
+			dragging = next;
+		},
+		(next) => {
+			dragHoverDateKey = next;
+		},
+		didDropRef,
+		popoverDragRef,
+	);
+	handleDragEnd();
+
+	assert.strictEqual(droppedTo, null);
+	assert.strictEqual(dragging, null);
+});
+
+void test('drag capture applies the grabbed-day offset to hover and drop dates', () => {
+	const segment = createSegment(
+		{ date: '2026-03-01', endDate: '2026-03-03' },
+		{ start: '2026-03-01', end: '2026-03-03', span: 3 },
+	);
+	let dragHoverDateKey: string | null = null;
+	let droppedTo: string | null = null;
+	const handlers = createDragCaptureHandlers(
+		() => segment,
+		() => '2026-03-03',
+		(next) => {
+			dragHoverDateKey = next;
+		},
+		(dateKey) => {
+			droppedTo = dateKey;
+		},
+		{ current: 1 },
+	);
+	const event = {
+		clientX: 100,
+		clientY: 100,
+		preventDefault: () => undefined,
+	} as DragEvent;
+
+	handlers.handleDragOverCapture(event);
+	assert.strictEqual(dragHoverDateKey, '2026-03-02');
+
+	handlers.handleDropCapture(event);
+	assert.strictEqual(droppedTo, '2026-03-02');
+});
+
 void test('createDragImage appends compact label preview to the target document', () => {
 	const segment = createSegment(
 		{
@@ -359,9 +488,10 @@ void test('handleDragEndFactory drops when hover date changed and no drop fired'
 	handleDragEnd();
 
 	assert.strictEqual(droppedTo, '2026-03-04');
-	assert.notStrictEqual(clearedDragging, null);
-	assert.notStrictEqual(clearedHover, null);
-	assert.strictEqual(popoverDragRef.current, true);
+	assert.strictEqual(clearedDragging, null);
+	assert.strictEqual(clearedHover, null);
+	assert.strictEqual(didDropRef.current, false);
+	assert.strictEqual(popoverDragRef.current, false);
 });
 
 void test('beginDragFromPopoverFactory initializes drag state from popover source', () => {
@@ -371,6 +501,7 @@ void test('beginDragFromPopoverFactory initializes drag state from popover sourc
 	let createDragImageCalls = 0;
 	const didDropRef = { current: true };
 	const popoverDragRef = { current: false };
+	const dragAnchorOffsetDaysRef = { current: 0 };
 	const segment = createSegment({ date: '2026-03-01', endDate: '2026-03-03' });
 
 	const beginDrag = beginDragFromPopoverFactory(
@@ -386,16 +517,54 @@ void test('beginDragFromPopoverFactory initializes drag state from popover sourc
 		() => {
 			createDragImageCalls += 1;
 		},
+		dragAnchorOffsetDaysRef,
 	);
 
-	beginDrag({} as DragEvent, segment);
+	beginDrag({} as DragEvent, segment, '2026-03-02');
 
 	assert.strictEqual(capturedStart, '2026-03-01');
 	assert.strictEqual(capturedEnd, '2026-03-03');
 	assert.strictEqual(nextHover, '2026-03-01');
+	assert.strictEqual(dragAnchorOffsetDaysRef.current, 1);
 	assert.strictEqual(didDropRef.current, false);
 	assert.strictEqual(popoverDragRef.current, true);
 	assert.strictEqual(createDragImageCalls, 1);
+});
+
+void test('beginDragFromPopoverFactory uses inferred overnight end date for timed events without endDate', () => {
+	let capturedStart: string | null = null;
+	let capturedEnd: string | null = null;
+	let capturedEndDate: string | null | undefined;
+	const didDropRef = { current: true };
+	const popoverDragRef = { current: false };
+	const segment = createSegment(
+		{
+			allDay: false,
+			date: '2026-06-12',
+			startTime: '20:00',
+			endTime: '01:01',
+		},
+		{ start: '2026-06-12', end: '2026-06-12', span: 1 },
+	);
+
+	const beginDrag = beginDragFromPopoverFactory(
+		(next) => {
+			capturedStart = next.start;
+			capturedEnd = next.end;
+			capturedEndDate = next.event.endDate;
+		},
+		() => undefined,
+		didDropRef,
+		popoverDragRef,
+		() => undefined,
+	);
+
+	beginDrag({} as DragEvent, segment);
+
+	assert.strictEqual(capturedStart, '2026-06-12');
+	assert.strictEqual(capturedEnd, '2026-06-13');
+	assert.strictEqual(capturedEndDate, '2026-06-13');
+	assert.strictEqual(popoverDragRef.current, true);
 });
 
 void test('createDragCaptureHandlers updates hover and forwards drop key', () => {

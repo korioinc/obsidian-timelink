@@ -1,16 +1,10 @@
 import { CheckIcon, XIcon } from './icons';
-import type { App, Component } from 'obsidian';
 import { h, type CSSProperties } from 'preact';
 import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 
 type ActionButtonSize = 'xs' | 'sm' | 'card' | 'md';
 
 type CardEditorInputProps = {
-	markdownContext: {
-		app: App;
-		component: Component;
-		sourcePath: string;
-	};
 	value: string;
 	onChange: (value: string) => void;
 	onSubmit: (value: string) => void;
@@ -51,7 +45,6 @@ const stopPointer = (event: Event) => {
 };
 
 export function CardEditorInput({
-	markdownContext,
 	value,
 	onChange,
 	onSubmit,
@@ -65,7 +58,6 @@ export function CardEditorInput({
 	actionContainerClassName,
 	autoFocus = true,
 }: CardEditorInputProps): h.JSX.Element {
-	void markdownContext;
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 	const onChangeRef = useRef(onChange);
 	const onSubmitRef = useRef(onSubmit);

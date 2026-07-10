@@ -41,6 +41,8 @@ const createFakeVault = (): FakeVault => {
 void test('isPathInDirectory matches directory and descendants only', () => {
 	assert.strictEqual(isPathInDirectory('calendar', 'calendar'), true);
 	assert.strictEqual(isPathInDirectory('calendar/day.md', 'calendar'), true);
+	assert.strictEqual(isPathInDirectory('calendar/day.md', 'calendar/'), true);
+	assert.strictEqual(isPathInDirectory('calendar\\day.md', 'calendar'), true);
 	assert.strictEqual(isPathInDirectory('calendar2/day.md', 'calendar'), false);
 	assert.strictEqual(isPathInDirectory('', 'calendar'), false);
 	assert.strictEqual(isPathInDirectory(null, 'calendar'), false);
@@ -68,4 +70,25 @@ void test('registerVaultPathRefresh reacts only to matching paths and unsubscrib
 	unregister();
 	fakeVault.trigger('create', 'calendar/d.md');
 	assert.deepEqual(calls, ['reload', 'reload', 'reload', 'reload']);
+});
+
+void test('registerVaultPathRefresh follows a changing directory provider', () => {
+	const calls: string[] = [];
+	const fakeVault = createFakeVault();
+	let directory = 'calendar';
+	const unregister = registerVaultPathRefresh(
+		fakeVault as unknown as import('obsidian').Vault,
+		() => directory,
+		() => {
+			calls.push('reload');
+		},
+	);
+
+	fakeVault.trigger('create', 'calendar/a.md');
+	directory = 'archive';
+	fakeVault.trigger('create', 'calendar/b.md');
+	fakeVault.trigger('create', 'archive/c.md');
+
+	assert.deepEqual(calls, ['reload', 'reload']);
+	unregister();
 });

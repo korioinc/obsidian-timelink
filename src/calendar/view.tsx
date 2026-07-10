@@ -106,7 +106,7 @@ const mountCalendarUI = (
 	containerEl: HTMLElement,
 	app: App,
 	calendar: FullNoteCalendar,
-	onOpenNote: (path: string) => void,
+	onOpenNote: (path: string) => Promise<void> | void,
 ): void => {
 	render(<CalendarRoot app={app} calendar={calendar} onOpenNote={onOpenNote} />, containerEl);
 };
@@ -140,7 +140,7 @@ export class TimeLinkCalendarView extends DatedEventItemView<FullNoteCalendar> {
 		containerEl: HTMLElement,
 		app: App,
 		calendar: FullNoteCalendar,
-		onOpenNote: (path: string) => void,
+		onOpenNote: (path: string) => Promise<void> | void,
 	): void {
 		mountCalendarUI(containerEl, app, calendar, onOpenNote);
 	}

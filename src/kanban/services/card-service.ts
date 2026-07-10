@@ -50,17 +50,6 @@ export function resolveLinkedCardFile(
 	return isTFileLike(linkedFile) ? linkedFile : null;
 }
 
-export function hasCardLinkedEvent(
-	app: CardLookupApp,
-	sourceFilePath: string,
-	title: string,
-	cardEventProperty: string,
-): boolean {
-	const linkedCardFile = resolveLinkedCardFile(app, sourceFilePath, title);
-	if (!linkedCardFile) return false;
-	return readFrontmatterString(app, linkedCardFile, cardEventProperty) !== null;
-}
-
 export function cardFileHasEventLink(
 	app: FrontmatterMetadataApp,
 	cardFile: FrontmatterFileLike,

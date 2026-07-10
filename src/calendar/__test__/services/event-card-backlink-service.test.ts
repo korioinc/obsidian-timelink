@@ -4,11 +4,13 @@ import {
 } from '../../../shared/frontmatter/timelink-frontmatter';
 import {
 	clearLinkedCardEventBacklink,
+	createLinkedCardEventBacklinkSnapshot,
+	restoreLinkedCardEventBacklink,
 	syncLinkedCardEventBacklink,
 	trashLinkedCardNoteIfBodyEmpty,
 } from '../../services/event-card-backlink-service';
 import type { App } from 'obsidian';
-import { assert, test } from 'vitest';
+import { assert, expect, test } from 'vitest';
 
 const createMockApp = (
 	cardFile: { path: string } | null,
@@ -82,6 +84,59 @@ void test('syncLinkedCardEventBacklink writes updated event link to linked card 
 	assert.strictEqual(
 		frontmatterByPath[cardFile.path]?.[TIMELINK_EVENT_KEY],
 		'[[Events/2026-03-05 test.md|Event title]]',
+	);
+});
+
+void test('linked-card backlink snapshot restores the exact previous property', async () => {
+	const cardFile = { path: 'Cards/Backlog card.md' };
+	const frontmatterByPath: Record<string, Record<string, unknown>> = {
+		[cardFile.path]: {
+			[TIMELINK_EVENT_KEY]: '[[Events/old.md|Old]]',
+		},
+	};
+	const app = createMockApp(cardFile, frontmatterByPath);
+	const snapshot = createLinkedCardEventBacklinkSnapshot();
+
+	await syncLinkedCardEventBacklink({
+		app,
+		eventFile: { path: 'Events/2026-03-05 test.md' },
+		sourcePath: 'Events/2026-03-05 test.md',
+		eventTitle: 'Event title',
+		frontmatter: { [TIMELINK_CARD_KEY]: '[[Cards/Backlog card]]' },
+		rollbackSnapshot: snapshot,
+	});
+	await restoreLinkedCardEventBacklink(app, snapshot);
+
+	assert.strictEqual(
+		frontmatterByPath[cardFile.path]?.[TIMELINK_EVENT_KEY],
+		'[[Events/old.md|Old]]',
+	);
+});
+
+void test('linked-card backlink rollback preserves a concurrent user edit', async () => {
+	const cardFile = { path: 'Cards/Backlog card.md' };
+	const frontmatterByPath: Record<string, Record<string, unknown>> = {
+		[cardFile.path]: { [TIMELINK_EVENT_KEY]: '[[Events/old.md|Old]]' },
+	};
+	const app = createMockApp(cardFile, frontmatterByPath);
+	const snapshot = createLinkedCardEventBacklinkSnapshot();
+
+	await syncLinkedCardEventBacklink({
+		app,
+		eventFile: { path: 'Events/2026-03-05 test.md' },
+		sourcePath: 'Events/2026-03-05 test.md',
+		eventTitle: 'Event title',
+		frontmatter: { [TIMELINK_CARD_KEY]: '[[Cards/Backlog card]]' },
+		rollbackSnapshot: snapshot,
+	});
+	frontmatterByPath[cardFile.path]![TIMELINK_EVENT_KEY] = '[[Events/user-edit.md|User edit]]';
+
+	await expect(restoreLinkedCardEventBacklink(app, snapshot)).rejects.toThrow(
+		'Linked card frontmatter changed',
+	);
+	assert.strictEqual(
+		frontmatterByPath[cardFile.path]?.[TIMELINK_EVENT_KEY],
+		'[[Events/user-edit.md|User edit]]',
 	);
 });
 

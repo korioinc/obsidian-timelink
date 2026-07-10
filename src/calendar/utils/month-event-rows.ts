@@ -1,11 +1,16 @@
 import { resolveNormalizedEventDateRange } from '../../shared/event/date-range';
 import { diffInDays, formatDateKey, parseDateKey, toMinutes } from '../../shared/event/model-utils';
+import { MinHeap } from '../../shared/utils/min-heap';
 import type { CalendarEvent, EventSegment } from '../types';
 import type { DayCellData } from './date-grid';
 import { compareEventTimeMinutesThenTitle } from './event-order';
 
 type LayoutEventSegment = Omit<EventSegment, 'id' | 'location'>;
 type EventRows = LayoutEventSegment[][];
+type ActiveEventRow = {
+	endIndex: number;
+	rowIndex: number;
+};
 
 const indexByDate = (grid: DayCellData[]): Map<string, number> => {
 	const map = new Map<string, number>();
@@ -14,8 +19,6 @@ const indexByDate = (grid: DayCellData[]): Map<string, number> => {
 	});
 	return map;
 };
-
-const parseTimeMinutes = (value?: string | null): number | null => toMinutes(value);
 
 const toNormalizedSegments = (
 	event: CalendarEvent,
@@ -84,8 +87,8 @@ export const buildEventRows = (events: CalendarEvent[], grid: DayCellData[]): Ev
 		}
 		if (a.span === 1 && b.span === 1) {
 			return compareEventTimeMinutesThenTitle(
-				parseTimeMinutes(a.event.startTime),
-				parseTimeMinutes(b.event.startTime),
+				toMinutes(a.event.startTime),
+				toMinutes(b.event.startTime),
 				a.event.title,
 				b.event.title,
 			);
@@ -93,24 +96,23 @@ export const buildEventRows = (events: CalendarEvent[], grid: DayCellData[]): Ev
 		return 0;
 	});
 	const rows: EventRows = [];
+	const activeRows = new MinHeap<ActiveEventRow>(
+		(left, right) => left.endIndex - right.endIndex || left.rowIndex - right.rowIndex,
+	);
+	const availableRows = new MinHeap<number>((left, right) => left - right);
 	for (const segment of segments) {
-		let placed = false;
-		for (const row of rows) {
-			const collision = row.some((existing) => {
-				if (segment.startIndex === -1 || existing.startIndex === -1) {
-					return true;
-				}
-				return !(segment.endIndex < existing.startIndex || segment.startIndex > existing.endIndex);
-			});
-			if (!collision) {
-				row.push(segment);
-				placed = true;
-				break;
-			}
+		while ((activeRows.peek()?.endIndex ?? Number.POSITIVE_INFINITY) < segment.startIndex) {
+			const expired = activeRows.pop();
+			if (expired) availableRows.push(expired.rowIndex);
 		}
-		if (!placed) {
-			rows.push([segment]);
+		const rowIndex = availableRows.pop() ?? rows.length;
+		const row = rows[rowIndex];
+		if (row) {
+			row.push(segment);
+		} else {
+			rows[rowIndex] = [segment];
 		}
+		activeRows.push({ endIndex: segment.endIndex, rowIndex });
 	}
 	return rows;
 };

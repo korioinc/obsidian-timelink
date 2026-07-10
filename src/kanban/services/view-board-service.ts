@@ -1,20 +1,30 @@
 import { normalizeHexColor } from '../../shared/color/normalize-hex-color';
 import { KANBAN_BOARD_COLOR_KEY } from '../../shared/frontmatter/kanban-frontmatter';
+import { createNotice } from '../../shared/services/notice-service';
+import { mapWithConcurrency } from '../../shared/utils/map-with-concurrency';
 import type { KanbanBoardSettings } from '../types';
+import { persistBoardMutation } from './board-mutation-service';
 import { collectLinkedEventFiles } from './card-service';
 import { updateFrontmatterColor } from './color-service';
 import { normalizeBoardSettings } from './settings-service';
 import type { BoardMutation, KanbanViewBoardServiceContext } from './view-service-context';
-import { Notice } from 'obsidian';
+
+const notice = createNotice();
+const LINKED_EVENT_COLOR_UPDATE_CONCURRENCY = 8;
 
 export const applyBoardMutation = async (
 	context: KanbanViewBoardServiceContext,
 	mutate: BoardMutation,
 ): Promise<boolean> => {
-	const board = context.getBoard();
-	if (!board) return false;
-	context.setBoard(mutate(board));
-	await context.persist();
+	if (!context.getFile()) return false;
+	let updated: boolean;
+	try {
+		updated = await persistBoardMutation(context, mutate);
+	} catch (error) {
+		context.render();
+		throw error;
+	}
+	if (!updated) return false;
 	context.render();
 	return true;
 };
@@ -23,17 +33,20 @@ export const updateBoardSettings = async (
 	context: KanbanViewBoardServiceContext,
 	partial: KanbanBoardSettings,
 ): Promise<void> => {
-	const board = context.getBoard();
-	if (!board) return;
-	const next = { ...board.settings, ...partial };
-	Object.keys(next).forEach((key) => {
-		const typedKey = key as keyof KanbanBoardSettings;
-		if (next[typedKey] === undefined) {
-			delete next[typedKey];
-		}
+	if (!context.getFile()) {
+		throw new Error('Cannot update kanban board settings without a file.');
+	}
+	const updated = await persistBoardMutation(context, (board) => {
+		const next = { ...board.settings, ...partial };
+		Object.keys(next).forEach((key) => {
+			const typedKey = key as keyof KanbanBoardSettings;
+			if (next[typedKey] === undefined) {
+				delete next[typedKey];
+			}
+		});
+		return { ...board, settings: normalizeBoardSettings(next) };
 	});
-	context.setBoard({ ...board, settings: normalizeBoardSettings(next) });
-	await context.persist();
+	if (!updated) return;
 	context.syncHeaderButtons();
 	context.render();
 };
@@ -53,11 +66,26 @@ const bulkUpdateLinkedEventColors = async (
 	);
 
 	const normalized = normalizeHexColor(color) ?? undefined;
-	for (const eventFile of eventFiles) {
-		await updateFrontmatterColor(context.app, eventFile, 'color', normalized);
+	const results = await mapWithConcurrency(
+		Array.from(eventFiles),
+		LINKED_EVENT_COLOR_UPDATE_CONCURRENCY,
+		async (eventFile) => {
+			try {
+				await updateFrontmatterColor(context.app, eventFile, 'color', normalized);
+				return true;
+			} catch (error) {
+				console.error(`Failed to update linked event color: ${eventFile.path}`, error);
+				return false;
+			}
+		},
+	);
+	const updatedCount = results.filter(Boolean).length;
+	const failedCount = results.length - updatedCount;
+	if (updatedCount > 0) {
+		notice(`Updated ${updatedCount} linked event${updatedCount === 1 ? '' : 's'}.`);
 	}
-	if (eventFiles.size > 0) {
-		new Notice(`Updated ${eventFiles.size} linked event${eventFiles.size === 1 ? '' : 's'}.`);
+	if (failedCount > 0) {
+		notice(`Failed to update ${failedCount} linked event${failedCount === 1 ? '' : 's'}.`);
 	}
 };
 
@@ -67,7 +95,7 @@ export const applyBoardColorChange = async (
 ): Promise<void> => {
 	const file = context.getFile();
 	if (!file) {
-		new Notice('Kanban board file not found.');
+		notice('Kanban board file not found.');
 		return;
 	}
 	const normalized = normalizeHexColor(color) ?? undefined;
@@ -75,7 +103,7 @@ export const applyBoardColorChange = async (
 		await updateFrontmatterColor(context.app, file, context.boardColorProperty, normalized);
 	} catch (error) {
 		console.error('Failed to update board color', error);
-		new Notice('Failed to update board color.');
+		notice('Failed to update board color.');
 		return;
 	}
 

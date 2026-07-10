@@ -15,6 +15,21 @@ void test('deriveTimedResizeStartState returns hover date, snapped minutes sourc
 	assert.strictEqual(state.color, '#00aa00');
 });
 
+void test('deriveTimedResizeStartState uses inferred overnight end date for timed events without endDate', () => {
+	const segment = createSegment(
+		{
+			date: '2026-06-12',
+			startTime: '20:00',
+			endTime: '01:01',
+		},
+		{ start: '2026-06-12', end: '2026-06-12' },
+	);
+	const state = deriveTimedResizeStartState(segment);
+
+	assert.strictEqual(state.hoverDateKey, '2026-06-13');
+	assert.strictEqual(state.hoverMinutes, 61);
+});
+
 void test('deriveTimedDragStartState returns segment start and start-time minutes', () => {
 	const segment = createSegment({ startTime: '07:30', color: '#2244ff' }, { start: '2026-03-05' });
 	const state = deriveTimedDragStartState(segment);

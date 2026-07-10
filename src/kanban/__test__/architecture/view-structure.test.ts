@@ -134,6 +134,19 @@ void test('kanban view uses a single unified service context factory', () => {
 	);
 });
 
+void test('kanban mutations await an immediate TextFileView save before reporting persistence', () => {
+	assert.strictEqual(
+		kanbanViewSource.includes('await this.save()'),
+		true,
+		'kanban persistence should await the actual TextFileView save operation',
+	);
+	assert.strictEqual(
+		kanbanViewSource.includes('this.requestSave()'),
+		false,
+		'destructive follow-up work must not rely on the debounced requestSave scheduler',
+	);
+});
+
 void test('kanban view card and cross-board action layers are reintegrated into unified action service', () => {
 	assert.strictEqual(
 		Object.keys(legacyCardActionsServiceModules).length,

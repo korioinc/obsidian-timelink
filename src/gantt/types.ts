@@ -4,21 +4,17 @@ import type { App } from 'obsidian';
 export type GanttScheduleRow = {
 	id: string;
 	title: string;
-	boardPath: string;
-	sourceEventPath: string;
 	startKey: string;
 	endKey: string;
 	color: string;
 };
 
-export type GanttBoardSchedule = KanbanListItem & {
+export type GanttBoardSchedule = Pick<KanbanListItem, 'path' | 'basename' | 'kanbanColor'> & {
 	rows: GanttScheduleRow[];
-	linkedCardPaths: string[];
-	linkedEventPaths: string[];
 	dependencyPaths: string[];
 };
 
-export type GanttYearRow = GanttScheduleRow & {
+type GanttYearPlacement = Pick<GanttScheduleRow, 'id' | 'title' | 'color'> & {
 	startDayIndex: number;
 	spanDays: number;
 };
@@ -29,25 +25,14 @@ export type GanttBoardLabel = {
 	kanbanColor?: string;
 };
 
-export type GanttDisplayRow = GanttYearRow & {
+export type GanttDisplayRow = GanttYearPlacement & {
 	boardLabel: GanttBoardLabel | null;
-};
-
-export type GanttBoardGroup = {
-	path: string;
-	basename: string;
-	folderPath: string;
-	folderDepth: number;
-	mtime: number;
-	kanbanColor?: string;
-	rows: GanttYearRow[];
 };
 
 export type GanttMonthCell = {
 	key: string;
 	label: string;
 	dayCount: number;
-	startDayIndex: number;
 };
 
 export type GanttDayCell = {
@@ -61,14 +46,18 @@ export type GanttYearView = {
 	months: GanttMonthCell[];
 	dayCells: GanttDayCell[];
 	todayDayIndex: number | null;
-	boardGroups: GanttBoardGroup[];
 	rows: GanttDisplayRow[];
+};
+
+export type GanttCalendarDirectorySource = {
+	getDirectory: () => string;
+	onDirectoryChange: (listener: () => void) => () => void;
 };
 
 export type GanttPluginContext = {
 	app: App;
-	settings: {
-		calendarFolderPath: string;
+	calendar: {
+		getCalendar: () => GanttCalendarDirectorySource;
 	};
 	openKanbanBoard: (boardPath: string) => Promise<void>;
 };

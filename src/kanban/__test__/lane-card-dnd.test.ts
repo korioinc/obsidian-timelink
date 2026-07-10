@@ -65,7 +65,6 @@ void test('card drag start stops propagation while preparing internal drag paylo
 		{
 			id: 'card-1',
 			title: 'Task',
-			lineStart: 0,
 		},
 		2,
 	);

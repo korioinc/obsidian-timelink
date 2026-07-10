@@ -4,8 +4,8 @@ import tsparser from '@typescript-eslint/parser';
 import eslintConfigPrettier from 'eslint-config-prettier';
 import obsidianmd from 'eslint-plugin-obsidianmd';
 import prettier from 'eslint-plugin-prettier';
-import pluginPromise from 'eslint-plugin-promise';
 import { globalIgnores } from 'eslint/config';
+import globals from 'globals';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
@@ -36,7 +36,6 @@ export default tseslint.config(
 			'eslint-comments': eslintComments,
 			obsidianmd,
 			prettier,
-			promise: pluginPromise,
 		},
 		rules: {
 			'@typescript-eslint/require-await': 'error',
@@ -47,6 +46,9 @@ export default tseslint.config(
 	},
 	{
 		files: ['**/*.{js,mjs,cjs}'],
+		languageOptions: {
+			globals: globals.node,
+		},
 		plugins: {
 			prettier,
 		},
@@ -79,12 +81,7 @@ export default tseslint.config(
 	globalIgnores([
 		'node_modules',
 		'dist',
-		'build-tailwind.mjs',
 		'eslint.config.mjs',
-		'esbuild.config.mjs',
-		'eslint.config.js',
-		'vitest.config.ts',
-		'version-bump.mjs',
 		'versions.json',
 		'main.js',
 		'styles.css',

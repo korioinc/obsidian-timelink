@@ -130,6 +130,19 @@ export const useEventModals = ({
 	const editController = useModalController();
 	const createController = useModalController();
 
+	useEffect(
+		() => () => {
+			closeModal(editController);
+			closeModal(createController);
+		},
+		[
+			editController.modalRef,
+			editController.wasOpenRef,
+			createController.modalRef,
+			createController.wasOpenRef,
+		],
+	);
+
 	useEffect(() => {
 		if (!modal) {
 			closeModal(editController);

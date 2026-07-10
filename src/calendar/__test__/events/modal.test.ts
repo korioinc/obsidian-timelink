@@ -249,6 +249,164 @@ void test('handleCreateSaveFactory validates and creates normalized timed event'
 	assert.strictEqual(closed, true);
 });
 
+void test('handleCreateSaveFactory persists next-day endDate for overnight timed event', () => {
+	const createModal: CreateEventState = {
+		title: '',
+		startDate: '2026-06-12',
+		endDate: '',
+		allDay: false,
+		taskEvent: true,
+		startTime: '20:00',
+		endTime: '01:01',
+		isCompleted: false,
+		color: '',
+	};
+	let createdEndDate: string | null | undefined;
+	let createdStartTime: string | undefined | null;
+	let createdEndTime: string | undefined | null;
+
+	const handleCreateSave = handleCreateSaveFactory(
+		() => createModal,
+		(next) => {
+			createdEndDate = next.endDate;
+			createdStartTime = next.startTime;
+			createdEndTime = next.endTime;
+		},
+		() => undefined,
+		() => undefined,
+	);
+
+	handleCreateSave({
+		title: 'expo conf',
+		date: '2026-06-12',
+		allDay: false,
+		taskEvent: true,
+		isCompleted: false,
+		startTime: '20:00',
+		endTime: '01:01',
+		color: '',
+	});
+
+	assert.strictEqual(createdEndDate, '2026-06-13');
+	assert.strictEqual(createdStartTime, '20:00');
+	assert.strictEqual(createdEndTime, '01:01');
+});
+
+void test('handleCreateSaveFactory does not persist endDate for same-day timed event', () => {
+	const createModal: CreateEventState = {
+		title: '',
+		startDate: '2026-06-12',
+		endDate: '',
+		allDay: false,
+		taskEvent: true,
+		startTime: '20:00',
+		endTime: '21:00',
+		isCompleted: false,
+		color: '',
+	};
+	let createdEndDate: string | null | undefined = null;
+
+	const handleCreateSave = handleCreateSaveFactory(
+		() => createModal,
+		(next) => {
+			createdEndDate = next.endDate;
+		},
+		() => undefined,
+		() => undefined,
+	);
+
+	handleCreateSave({
+		title: 'same day',
+		date: '2026-06-12',
+		allDay: false,
+		taskEvent: true,
+		isCompleted: false,
+		startTime: '20:00',
+		endTime: '21:00',
+		color: '',
+	});
+
+	assert.strictEqual(createdEndDate, undefined);
+});
+
+void test('handleModalSaveFactory persists next-day endDate for overnight timed event', () => {
+	const segment = createSegment({
+		title: 'expo conf',
+		allDay: false,
+		date: '2026-06-12',
+		endDate: undefined,
+		taskEvent: true,
+		startTime: '20:00',
+		endTime: '01:01',
+	});
+	const modal = createModalState(segment);
+	let savedEndDate: string | null | undefined;
+	let savedStartTime: string | undefined | null;
+	let savedEndTime: string | undefined | null;
+
+	const handleModalSave = handleModalSaveFactory(
+		() => modal,
+		(next) => {
+			savedEndDate = next[0].endDate;
+			savedStartTime = next[0].startTime;
+			savedEndTime = next[0].endTime;
+		},
+		() => undefined,
+		() => undefined,
+	);
+
+	handleModalSave({
+		title: 'expo conf',
+		date: '2026-06-12',
+		allDay: false,
+		taskEvent: true,
+		isCompleted: false,
+		startTime: '20:00',
+		endTime: '01:01',
+		color: '',
+	});
+
+	assert.strictEqual(savedEndDate, '2026-06-13');
+	assert.strictEqual(savedStartTime, '20:00');
+	assert.strictEqual(savedEndTime, '01:01');
+});
+
+void test('handleModalSaveFactory preserves explicit next-day midnight endDate', () => {
+	const segment = createSegment({
+		title: 'midnight boundary',
+		allDay: false,
+		date: '2026-06-12',
+		endDate: '2026-06-13',
+		taskEvent: true,
+		startTime: '20:00',
+		endTime: '00:00',
+	});
+	const modal = createModalState(segment);
+	let savedEndDate: string | null | undefined;
+
+	const handleModalSave = handleModalSaveFactory(
+		() => modal,
+		(next) => {
+			savedEndDate = next[0].endDate;
+		},
+		() => undefined,
+		() => undefined,
+	);
+
+	handleModalSave({
+		title: 'midnight boundary',
+		date: '2026-06-12',
+		allDay: false,
+		taskEvent: true,
+		isCompleted: false,
+		startTime: '20:00',
+		endTime: '00:00',
+		color: '',
+	});
+
+	assert.strictEqual(savedEndDate, '2026-06-13');
+});
+
 void test('buildModalActionHandlers passes linked note deletion choice after approval', async () => {
 	const segment = createSegment({ title: 'Delete me' });
 	const modal = createModalState(segment);
@@ -321,4 +479,59 @@ void test('createGridEventClickHandler normalizes legacy 24:00 modal end time to
 
 	assert.strictEqual(modalEndTime, '00:00');
 	assert.strictEqual(modalEndDate, '2026-03-06');
+});
+
+void test('editing a continuation segment preserves the event start date', () => {
+	const segment = createSegment(
+		{
+			title: 'Cross-day event',
+			allDay: false,
+			date: '2026-03-05',
+			endDate: '2026-03-06',
+			startTime: '23:00',
+			endTime: '02:00',
+		},
+		{
+			start: '2026-03-06',
+			end: '2026-03-06',
+			span: 1,
+		},
+	);
+	const openedModals: ReturnType<typeof createModalState>[] = [];
+
+	const handleEventClick = createGridEventClickHandler(
+		(next) => {
+			openedModals.push(next);
+		},
+		() => undefined,
+		() => false,
+		{ current: false },
+	);
+	handleEventClick(segment);
+
+	const openedModal = openedModals[0];
+	assert.ok(openedModal);
+	assert.strictEqual(openedModal.date, '2026-03-05');
+
+	let savedDate: string | undefined;
+	const handleModalSave = handleModalSaveFactory(
+		() => openedModal,
+		(next) => {
+			savedDate = next[0].date;
+		},
+		() => undefined,
+		() => undefined,
+	);
+	handleModalSave({
+		title: openedModal.title,
+		date: openedModal.date,
+		allDay: openedModal.allDay,
+		taskEvent: openedModal.taskEvent,
+		isCompleted: openedModal.isCompleted,
+		startTime: openedModal.startTime,
+		endTime: openedModal.endTime,
+		color: openedModal.color,
+	});
+
+	assert.strictEqual(savedDate, '2026-03-05');
 });

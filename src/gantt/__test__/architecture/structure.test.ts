@@ -68,12 +68,7 @@ void test('gantt grid renders day-number header and board open action without fi
 	);
 });
 
-void test('gantt root wraps board-open callback and wires today-button scroll requests', () => {
-	assert.strictEqual(
-		ganttViewSource.includes('onOpenBoard={(boardPath) => void plugin.openKanbanBoard(boardPath)}'),
-		true,
-		'gantt root should preserve plugin method binding when wiring board-open callback',
-	);
+void test('gantt root wires today-button scroll requests without an unbound opener', () => {
 	assert.strictEqual(
 		ganttViewSource.includes('setScrollToTodayRequestKey((current) => current + 1)'),
 		true,
@@ -181,7 +176,7 @@ void test('gantt header uses icon prev/next buttons and keeps year control order
 	assert.strictEqual(todayIndex < yearIndex, true, 'today button should come before year label');
 });
 
-void test('main registers gantt view and ribbon icon alongside existing workspace views', () => {
+void test('main registers the gantt view alongside existing workspace views', () => {
 	assert.strictEqual(
 		mainSource.includes('GANTT_VIEW_TYPE'),
 		true,
@@ -191,26 +186,6 @@ void test('main registers gantt view and ribbon icon alongside existing workspac
 		mainSource.includes('new TimeLinkGanttView(leaf, this)'),
 		true,
 		'main should register the gantt item view',
-	);
-	assert.strictEqual(
-		mainSource.includes('private ganttRibbonIcon: HTMLElement | null = null;'),
-		true,
-		'main should track gantt ribbon element for enable/disable sync',
-	);
-	assert.strictEqual(
-		mainSource.includes('ensureGanttRibbonIcon'),
-		true,
-		'main should manage gantt ribbon icon lifecycle',
-	);
-	assert.strictEqual(
-		mainSource.includes('this.ensureGanttRibbonIcon();'),
-		true,
-		'main should attach gantt ribbon through kanban sync lifecycle',
-	);
-	assert.strictEqual(
-		mainSource.includes('this.removeGanttRibbonIcon();'),
-		true,
-		'main should remove gantt ribbon through kanban sync lifecycle',
 	);
 	assert.strictEqual(
 		mainSource.includes('openGanttView'),

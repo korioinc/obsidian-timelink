@@ -1,5 +1,6 @@
 import {
 	createEventEntry,
+	createEventModificationGuard,
 	createUpdateLocationHandler,
 	deleteEventEntry,
 	loadEventEntries,
@@ -11,10 +12,11 @@ import type { CalendarEvent, DeleteEventOptions, EditableEventResponse } from '.
 import { createNotice } from '../services/notice-service';
 import { useVaultPathDataLoader } from './use-vault-path-data-loader';
 import type { App } from 'obsidian';
-import { useCallback, useMemo, useState } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 
 export type EventEntriesCalendar = EventServiceDeps['calendar'] & {
 	getDirectory: () => string;
+	onDirectoryChange?: (listener: () => void) => () => void;
 };
 
 type UseEventEntriesControllerParams = {
@@ -40,19 +42,26 @@ export const useEventEntriesController = ({
 }: UseEventEntriesControllerParams): UseEventEntriesControllerResult => {
 	const [events, setEvents] = useState<EditableEventResponse[]>([]);
 	const notice = useMemo(() => createNotice(), []);
-	const calendarDirectory = useMemo(() => calendar.getDirectory(), [calendar]);
+	const getCalendarDirectory = useCallback(() => calendar.getDirectory(), [calendar]);
 
 	const loadEvents = useCallback(async () => loadEventEntries(calendar), [calendar]);
-	const { loadError, scheduleReload } = useVaultPathDataLoader({
+	const { loadError, scheduleReload, reload } = useVaultPathDataLoader({
 		app,
-		directory: calendarDirectory,
+		directory: getCalendarDirectory,
 		load: loadEvents,
 		onLoaded: setEvents,
 		errorMessage: 'Failed to load the calendar.',
 		errorLogLabel: 'Failed to load calendar events',
 	});
 
+	useEffect(() => {
+		return calendar.onDirectoryChange?.(() => {
+			void reload();
+		});
+	}, [calendar, reload]);
+
 	const updateLocation = useMemo(() => createUpdateLocationHandler(setEvents), []);
+	const beginModification = useMemo(() => createEventModificationGuard(), []);
 	const eventServiceDeps = useMemo<EventServiceDeps>(
 		() => ({
 			calendar,
@@ -60,8 +69,9 @@ export const useEventEntriesController = ({
 			scheduleReload,
 			notice,
 			updateLocation,
+			beginModification,
 		}),
-		[calendar, notice, scheduleReload, updateLocation],
+		[beginModification, calendar, notice, scheduleReload, updateLocation],
 	);
 
 	const handleSaveEvent = useCallback(

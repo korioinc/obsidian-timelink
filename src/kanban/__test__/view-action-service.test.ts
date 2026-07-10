@@ -13,9 +13,7 @@ const createBoard = (title = '[[Cards/Task|Task]]'): KanbanBoard => ({
 		{
 			id: 'lane-1',
 			title: 'Todo',
-			lineStart: 0,
-			lineEnd: 0,
-			cards: [{ id: 'card-1', title, lineStart: 0 }],
+			cards: [{ id: 'card-1', title }],
 		},
 	],
 });
@@ -27,6 +25,7 @@ const createHarness = (
 		eventLink?: string | null;
 		deleteEventError?: boolean;
 		trashError?: boolean;
+		boardMutation?: 'success' | 'false' | 'throw';
 	} = {},
 ) => {
 	let board = createBoard();
@@ -88,6 +87,12 @@ const createHarness = (
 		getTodayDateKey: () => '2026-03-02',
 		applyBoardMutation: (mutate: (nextBoard: KanbanBoard) => KanbanBoard) => {
 			calls.push('removeCard');
+			if (options.boardMutation === 'throw') {
+				return Promise.reject(new Error('board persist failed'));
+			}
+			if (options.boardMutation === 'false') {
+				return Promise.resolve(false);
+			}
 			board = mutate(board);
 			return Promise.resolve(true);
 		},
@@ -121,7 +126,7 @@ void test('getDeleteLinkedNoteLabel mentions linked event when present', () => {
 	assert.strictEqual(getDeleteLinkedNoteLabel(true), 'Also delete linked note and linked event');
 });
 
-void test('removeCardWithLinkedCleanup deletes linked event and note before removing the card', async () => {
+void test('removeCardWithLinkedCleanup persists card removal before deleting linked artifacts', async () => {
 	const harness = createHarness({
 		eventLink: '[[Events/2026-03-02 Task.md]]',
 	});
@@ -135,9 +140,9 @@ void test('removeCardWithLinkedCleanup deletes linked event and note before remo
 	});
 
 	assert.deepEqual(harness.calls, [
+		'removeCard',
 		'deleteEvent:Events/2026-03-02 Task.md',
 		'trash:Cards/Task.md',
-		'removeCard',
 	]);
 	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 0);
 	assert.deepEqual(harness.notices, []);
@@ -154,12 +159,56 @@ void test('removeCardWithLinkedCleanup deletes only the linked note when no link
 		options: { deleteLinkedNote: true },
 	});
 
-	assert.deepEqual(harness.calls, ['trash:Cards/Task.md', 'removeCard']);
+	assert.deepEqual(harness.calls, ['removeCard', 'trash:Cards/Task.md']);
 	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 0);
 	assert.deepEqual(harness.notices, []);
 });
 
-void test('removeCardWithLinkedCleanup keeps the card when linked event deletion fails', async () => {
+void test('removeCardWithLinkedCleanup does not delete artifacts when board persistence fails', async () => {
+	const harness = createHarness({
+		eventLink: '[[Events/2026-03-02 Task.md]]',
+		boardMutation: 'throw',
+	});
+
+	await withMutedConsoleError(async () => {
+		await removeCardWithLinkedCleanup({
+			...harness.context,
+			board: harness.getBoard(),
+			sourceFile: harness.getBoardFile(),
+			cardId: 'card-1',
+			options: { deleteLinkedNote: true },
+		});
+	});
+
+	assert.deepEqual(harness.calls, ['removeCard']);
+	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 1);
+	assert.deepEqual(harness.notices, [
+		'Could not confirm card removal. Linked note and event were not deleted.',
+	]);
+});
+
+void test('removeCardWithLinkedCleanup requires a confirmed board mutation before cleanup', async () => {
+	const harness = createHarness({
+		eventLink: '[[Events/2026-03-02 Task.md]]',
+		boardMutation: 'false',
+	});
+
+	await removeCardWithLinkedCleanup({
+		...harness.context,
+		board: harness.getBoard(),
+		sourceFile: harness.getBoardFile(),
+		cardId: 'card-1',
+		options: { deleteLinkedNote: true },
+	});
+
+	assert.deepEqual(harness.calls, ['removeCard']);
+	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 1);
+	assert.deepEqual(harness.notices, [
+		'Failed to remove the card. Linked note and event were not deleted.',
+	]);
+});
+
+void test('removeCardWithLinkedCleanup reports event cleanup failure after removing the card', async () => {
 	const harness = createHarness({
 		eventLink: '[[Events/2026-03-02 Task.md]]',
 		deleteEventError: true,
@@ -175,12 +224,14 @@ void test('removeCardWithLinkedCleanup keeps the card when linked event deletion
 		});
 	});
 
-	assert.deepEqual(harness.calls, ['deleteEvent:Events/2026-03-02 Task.md']);
-	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 1);
-	assert.deepEqual(harness.notices, ['Failed to delete the linked event. Card was not removed.']);
+	assert.deepEqual(harness.calls, ['removeCard', 'deleteEvent:Events/2026-03-02 Task.md']);
+	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 0);
+	assert.deepEqual(harness.notices, [
+		'Card removed, but failed to delete the linked event. The linked note was not deleted.',
+	]);
 });
 
-void test('removeCardWithLinkedCleanup keeps the card when linked note deletion fails', async () => {
+void test('removeCardWithLinkedCleanup reports note cleanup failure after removing the card', async () => {
 	const harness = createHarness({
 		trashError: true,
 	});
@@ -195,7 +246,34 @@ void test('removeCardWithLinkedCleanup keeps the card when linked note deletion 
 		});
 	});
 
-	assert.deepEqual(harness.calls, ['trash:Cards/Task.md']);
-	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 1);
-	assert.deepEqual(harness.notices, ['Failed to delete the linked note. Card was not removed.']);
+	assert.deepEqual(harness.calls, ['removeCard', 'trash:Cards/Task.md']);
+	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 0);
+	assert.deepEqual(harness.notices, ['Card removed, but failed to delete the linked note.']);
+});
+
+void test('removeCardWithLinkedCleanup reports partial cleanup after event deletion succeeds', async () => {
+	const harness = createHarness({
+		eventLink: '[[Events/2026-03-02 Task.md]]',
+		trashError: true,
+	});
+
+	await withMutedConsoleError(async () => {
+		await removeCardWithLinkedCleanup({
+			...harness.context,
+			board: harness.getBoard(),
+			sourceFile: harness.getBoardFile(),
+			cardId: 'card-1',
+			options: { deleteLinkedNote: true },
+		});
+	});
+
+	assert.deepEqual(harness.calls, [
+		'removeCard',
+		'deleteEvent:Events/2026-03-02 Task.md',
+		'trash:Cards/Task.md',
+	]);
+	assert.strictEqual(harness.getBoard().lanes[0]?.cards.length, 0);
+	assert.deepEqual(harness.notices, [
+		'Card and linked event were removed, but failed to delete the linked note.',
+	]);
 });

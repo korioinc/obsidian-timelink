@@ -2,34 +2,102 @@ name: Release Obsidian plugin
 
 on:
   push:
-    tags:
-      - "*"
+    branches:
+      - main
+    paths:
+      - manifest.json
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Use Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: "22.x"
+          node-version: '22.x'
+
+      - name: Prepare release metadata
+        id: release
+        run: |
+          version="$(node release-metadata.mjs sync)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate manifest version change
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          previous_version="$(git show "${BEFORE_SHA}:manifest.json" | node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const manifest = JSON.parse(readFileSync(0, "utf8"));
+            process.stdout.write(manifest.version ?? "");
+          ')"
+
+          if [ "$previous_version" = "$VERSION" ]; then
+            echo "manifest.json changed without a version bump." >&2
+            exit 1
+          fi
+
+      - name: Ensure release tag does not exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "GitHub release $VERSION already exists." >&2
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            echo "Release tag $VERSION already exists." >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
 
       - name: Build plugin
-        run: |
-          npm install
-          npm run build
+        run: npm run build
 
-      - name: Create release
+      - name: Commit compatibility metadata
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
+          if ! git diff --quiet -- versions.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add versions.json
+            git commit -m "chore(release): record $VERSION compatibility"
+            git push origin HEAD:main
+          fi
 
-          gh release create "$tag" \
-            --title="$tag" \
+      - name: Create tag and release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.release.outputs.version }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          gh release create "$VERSION" \
+            --target "$TARGET_SHA" \
+            --title "$VERSION" \
+            --generate-notes \
             --latest \
             main.js manifest.json styles.css

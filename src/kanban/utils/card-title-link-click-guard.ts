@@ -4,7 +4,7 @@ const getInteractionTimestamp = (): number => {
 	return (typeof window === 'undefined' ? undefined : window.performance?.now()) ?? Date.now();
 };
 
-export type CardTitleLinkClickGuard = {
+type CardTitleLinkClickGuard = {
 	noteDragInteraction: () => void;
 	shouldSuppressClick: () => boolean;
 };

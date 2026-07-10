@@ -2,7 +2,7 @@ import type { KanbanBoard } from '../types';
 import { CardEditorInput } from './CardEditorInput';
 import { CardTitleRenderer, type CardTitleMarkdownContext } from './CardTitleRenderer';
 import { MenuIcon } from './icons';
-import { h } from 'preact';
+import { h, type TargetedDragEvent } from 'preact';
 
 type LaneColumnCardsProps = {
 	markdownContext: CardTitleMarkdownContext;
@@ -19,15 +19,20 @@ type LaneColumnCardsProps = {
 	cancelCardEdit: (cardId: string, fallbackTitle: string) => void;
 	startEditCard: (cardId: string, title: string) => void;
 	cardTitleRef: { current: Map<string, string> };
-	openCardOptions: (event: MouseEvent, cardId: string, title: string) => void;
-	handleCardDragOver: (event: DragEvent) => void;
-	handleCardDrop: (event: DragEvent) => void;
+	openCardOptions: (
+		event: MouseEvent | KeyboardEvent,
+		anchorEl: HTMLElement,
+		cardId: string,
+		title: string,
+	) => void;
+	handleCardDragOver: (event: TargetedDragEvent<HTMLUListElement>) => void;
+	handleCardDrop: (event: TargetedDragEvent<HTMLUListElement>) => void;
 	handleCardDragStart: (
-		event: DragEvent,
+		event: TargetedDragEvent<HTMLLIElement>,
 		card: KanbanBoard['lanes'][number]['cards'][number],
 		index: number,
 	) => void;
-	handleCardDragEnd: (event: DragEvent, cardId: string) => void;
+	handleCardDragEnd: (event: TargetedDragEvent<HTMLLIElement>, cardId: string) => void;
 	isAdding: boolean;
 	setIsAdding: (value: boolean) => void;
 	draftTitle: string;
@@ -93,7 +98,6 @@ export const LaneColumnCards = ({
 					>
 						{editingCardId === card.id ? (
 							<CardEditorInput
-								markdownContext={markdownContext}
 								value={draftCardTitle}
 								onChange={setDraftCardTitle}
 								onSubmit={(nextValue) => void submitCardEdit(nextValue)}
@@ -122,11 +126,13 @@ export const LaneColumnCards = ({
 									tabIndex={0}
 									className="absolute top-0 right-0 inline-flex h-5 w-5 items-center justify-center rounded-sm text-[color:var(--text-muted)] hover:bg-[var(--background-modifier-hover)] hover:text-[color:var(--text-normal)]"
 									aria-label="More options"
-									onClick={(event) => openCardOptions(event, card.id, card.title)}
+									onClick={(event) =>
+										openCardOptions(event, event.currentTarget, card.id, card.title)
+									}
 									onKeyDown={(event) => {
 										if (event.key === 'Enter' || event.key === ' ') {
 											event.preventDefault();
-											openCardOptions(event as unknown as MouseEvent, card.id, card.title);
+											openCardOptions(event, event.currentTarget, card.id, card.title);
 										}
 									}}
 								>
@@ -143,7 +149,6 @@ export const LaneColumnCards = ({
 					<div className="px-1.5">
 						<div className="mt-2 rounded-md border border-[var(--background-modifier-border)] bg-[var(--background-secondary)] px-3 py-2">
 							<CardEditorInput
-								markdownContext={markdownContext}
 								value={draftTitle}
 								onChange={setDraftTitle}
 								onSubmit={(nextValue) => void submitCard(nextValue)}

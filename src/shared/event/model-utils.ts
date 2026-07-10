@@ -1,3 +1,4 @@
+import { MinHeap } from '../utils/min-heap';
 import type { CalendarEvent, EventSegment, TimedEventPlacement } from './types';
 
 export const DEFAULT_EVENT_COLOR = 'var(--interactive-accent)';
@@ -91,27 +92,107 @@ export const formatTime = (minutes: number) => {
 	return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 };
 
+type EffectiveTimedEventRange = {
+	startKey: string;
+	endKey: string;
+	startMinutes: number;
+	endMinutes: number;
+};
+
+export const resolveEffectiveTimedEventRange = (
+	event: Pick<CalendarEvent, 'allDay' | 'date' | 'endDate' | 'startTime' | 'endTime'>,
+): EffectiveTimedEventRange | null => {
+	if (event.allDay) return null;
+	if (!event.date) return null;
+	const startMinutes = toMinutes(event.startTime);
+	const endMinutes = toMinutes(event.endTime);
+	if (startMinutes === null || endMinutes === null) return null;
+
+	const startKey = event.date;
+	let endKey = event.endDate || startKey;
+	if (compareDateKey(endKey, startKey) < 0) {
+		return null;
+	}
+	if (endKey !== startKey) {
+		return { startKey, endKey, startMinutes, endMinutes };
+	}
+	if (endMinutes > startMinutes) {
+		return { startKey, endKey, startMinutes, endMinutes };
+	}
+	if (!event.endDate && endMinutes < startMinutes) {
+		endKey = formatDateKey(addDays(parseDateKey(startKey), 1));
+		return { startKey, endKey, startMinutes, endMinutes };
+	}
+	return null;
+};
+
 const getDurationMinutes = (start: number, end: number) => Math.max(0, end - start);
 
 export const isTimedEvent = (event: CalendarEvent) => {
-	if (event.allDay) return false;
-	if (!event.date) return false;
-	const start = toMinutes(event.startTime);
-	const end = toMinutes(event.endTime);
-	if (start === null || end === null) return false;
-	if (event.endDate && event.endDate !== event.date) return true;
-	return end > start;
+	return resolveEffectiveTimedEventRange(event) !== null;
 };
 
-export const assignColumns = (
-	entries: Array<{
-		segment: EventSegment;
-		dayOffset: number;
-		startMinutes: number;
-		endMinutes: number;
-	}>,
-): TimedEventPlacement[] => {
-	const result: TimedEventPlacement[] = [];
+type TimedColumnEntry = {
+	segment: EventSegment;
+	dayOffset: number;
+	startMinutes: number;
+	endMinutes: number;
+};
+
+type ActiveTimedColumn = {
+	endMinutes: number;
+	column: number;
+};
+
+const createRangeMaximumQuery = (values: number[]) => {
+	const valueCount = values.length;
+	const tree = new Array<number>(valueCount * 2).fill(0);
+	values.forEach((value, index) => {
+		tree[valueCount + index] = value;
+	});
+	for (let index = valueCount - 1; index > 0; index -= 1) {
+		tree[index] = Math.max(tree[index * 2] ?? 0, tree[index * 2 + 1] ?? 0);
+	}
+
+	return (startIndex: number, endIndex: number): number => {
+		let left = startIndex + valueCount;
+		let right = endIndex + valueCount;
+		let maximum = 0;
+		while (left <= right) {
+			if (left % 2 === 1) {
+				maximum = Math.max(maximum, tree[left] ?? 0);
+				left += 1;
+			}
+			if (right % 2 === 0) {
+				maximum = Math.max(maximum, tree[right] ?? 0);
+				right -= 1;
+			}
+			left = Math.floor(left / 2);
+			right = Math.floor(right / 2);
+		}
+		return maximum;
+	};
+};
+
+const findFirstEntryStartingAtOrAfter = (
+	entries: TimedColumnEntry[],
+	targetMinutes: number,
+): number => {
+	let low = 0;
+	let high = entries.length;
+	while (low < high) {
+		const middle = Math.floor((low + high) / 2);
+		if ((entries[middle]?.startMinutes ?? Number.POSITIVE_INFINITY) < targetMinutes) {
+			low = middle + 1;
+		} else {
+			high = middle;
+		}
+	}
+	return low;
+};
+
+export const assignColumns = (entries: TimedColumnEntry[]): TimedEventPlacement[] => {
+	if (entries.length === 0) return [];
 	const sorted = [...entries].sort((a, b) => {
 		if (a.startMinutes !== b.startMinutes) return a.startMinutes - b.startMinutes;
 		const aDuration = getDurationMinutes(a.startMinutes, a.endMinutes);
@@ -119,14 +200,28 @@ export const assignColumns = (
 		if (aDuration !== bDuration) return bDuration - aDuration;
 		return a.segment.event.title.localeCompare(b.segment.event.title);
 	});
-	let active: TimedEventPlacement[] = [];
+	const activeColumns = new MinHeap<ActiveTimedColumn>(
+		(left, right) => left.endMinutes - right.endMinutes || left.column - right.column,
+	);
+	const availableColumns = new MinHeap<number>((left, right) => left - right);
+	const activeColumnFlags: boolean[] = [];
+	const activeColumnsByDescendingIndex = new MinHeap<number>((left, right) => right - left);
+	const columnCountsAfterInsertion: number[] = [];
+	const result: TimedEventPlacement[] = [];
+	let nextColumn = 0;
 	for (const entry of sorted) {
-		active = active.filter((item) => item.endMinutes > entry.startMinutes);
-		const usedColumns = new Set(active.map((item) => item.column));
-		let column = 0;
-		while (usedColumns.has(column)) {
-			column += 1;
+		while ((activeColumns.peek()?.endMinutes ?? Number.POSITIVE_INFINITY) <= entry.startMinutes) {
+			const expired = activeColumns.pop();
+			if (!expired) break;
+			activeColumnFlags[expired.column] = false;
+			availableColumns.push(expired.column);
 		}
+		const availableColumn = availableColumns.pop();
+		const column = availableColumn ?? nextColumn;
+		if (availableColumn === undefined) nextColumn += 1;
+		activeColumnFlags[column] = true;
+		activeColumnsByDescendingIndex.push(column);
+		activeColumns.push({ endMinutes: entry.endMinutes, column });
 		const placement: TimedEventPlacement = {
 			segment: entry.segment,
 			dayOffset: entry.dayOffset,
@@ -135,14 +230,22 @@ export const assignColumns = (
 			column,
 			columnCount: 1,
 		};
-		active.push(placement);
-		const maxColumn = Math.max(...active.map((item) => item.column));
-		const columnCount = maxColumn + 1;
-		for (const item of active) {
-			item.columnCount = Math.max(item.columnCount, columnCount);
-		}
 		result.push(placement);
+		while (
+			activeColumnsByDescendingIndex.peek() !== undefined &&
+			!activeColumnFlags[activeColumnsByDescendingIndex.peek()!]
+		) {
+			activeColumnsByDescendingIndex.pop();
+		}
+		columnCountsAfterInsertion.push((activeColumnsByDescendingIndex.peek() ?? 0) + 1);
 	}
+
+	const queryMaximumColumnCount = createRangeMaximumQuery(columnCountsAfterInsertion);
+	result.forEach((placement, index) => {
+		const firstInactiveIndex = findFirstEntryStartingAtOrAfter(sorted, placement.endMinutes);
+		const lastActiveIndex = Math.max(index, firstInactiveIndex - 1);
+		placement.columnCount = queryMaximumColumnCount(index, lastActiveIndex);
+	});
 	return result;
 };
 

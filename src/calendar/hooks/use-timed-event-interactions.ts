@@ -35,6 +35,7 @@ export const useTimedEventInteractions = ({
 }: UseTimedEventInteractionsParams): UseTimedEventInteractionsResult =>
 	useTimedGridEventInteractions({
 		defaultEventColor,
+		resizeStepMinutes: slotMinutes,
 		isResizingRef,
 		onSaveEvent,
 		onMoveEvent,

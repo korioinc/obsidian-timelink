@@ -1,16 +1,16 @@
+import { readFrontmatterString } from '../shared/frontmatter/file-frontmatter';
 import { KANBAN_BOARD_COLOR_KEY } from '../shared/frontmatter/kanban-frontmatter';
 import { TIMELINK_CARD_KEY, TIMELINK_EVENT_KEY } from '../shared/frontmatter/timelink-frontmatter';
+import { SerialTaskQueue } from '../shared/utils/serial-task-queue';
+import { ViewRenderLifecycle } from '../shared/view/view-render-lifecycle';
 import { KANBAN_ICON, KANBAN_VIEW_TYPE } from './constants';
 import {
 	findOpenKanbanLeafByPath,
-	hasCardLinkedEvent,
 	removeCardFromBoardFile,
+	resolveLinkedCardFile,
 } from './services/card-service';
-import {
-	buildLinkedCardPathSet,
-	registerKanbanCardEventIndicatorRefresh,
-} from './services/event-indicator-refresh-service';
-import { buildCardEventMap, buildCardTitleMap } from './services/model-service';
+import { registerKanbanCardEventIndicatorRefresh } from './services/event-indicator-refresh-service';
+import { buildCardDerivedState } from './services/model-service';
 import { serializeKanbanBoard } from './services/parser-service';
 import {
 	buildKanbanRootActionHandlers,
@@ -28,7 +28,7 @@ import {
 	type KanbanViewMode,
 } from './services/view-composition-service';
 import type { KanbanViewServiceContext } from './services/view-service-context';
-import type { KanbanBoard, KanbanBoardSettings } from './types';
+import type { KanbanBoard, KanbanBoardSettings, KanbanRootActionHandlers } from './types';
 import { KanbanRoot, type KanbanRootProps } from './view/KanbanRoot';
 import {
 	buildPaneMenuActionDescriptors,
@@ -55,6 +55,9 @@ export class KanbanView extends TextFileView {
 	private cardHasEventById = new Map<string, boolean>();
 	private linkedCardPaths = new Set<string>();
 	private stopCardEventIndicatorRefresh: (() => void) | null = null;
+	private rootActionHandlers: KanbanRootActionHandlers | null = null;
+	private readonly renderLifecycle = new ViewRenderLifecycle();
+	private readonly boardMutationQueue = new SerialTaskQueue();
 	private static readonly CARD_EVENT_PROPERTY = TIMELINK_EVENT_KEY;
 	private static readonly EVENT_CARD_PROPERTY = TIMELINK_CARD_KEY;
 	private static readonly BOARD_COLOR_PROPERTY = KANBAN_BOARD_COLOR_KEY;
@@ -79,7 +82,10 @@ export class KanbanView extends TextFileView {
 	}
 
 	private openAsMarkdown(): void {
-		void this.plugin.openKanbanAsMarkdown(this.leaf, { readOnly: true });
+		void this.plugin.openKanbanAsMarkdown(this.leaf, { readOnly: true }).catch((error: unknown) => {
+			console.error('Failed to open kanban board as markdown', error);
+			new Notice('Failed to open board as Markdown.');
+		});
 	}
 
 	private syncHeaderButtons(): void {
@@ -108,15 +114,23 @@ export class KanbanView extends TextFileView {
 	}
 
 	private async applyBoardMutation(mutate: (board: KanbanBoard) => KanbanBoard): Promise<boolean> {
-		return applyBoardMutationService(this.createServiceContext(), mutate);
+		return this.boardMutationQueue.run(() =>
+			applyBoardMutationService(this.createServiceContext(), mutate),
+		);
 	}
 
 	async updateBoardSettings(partial: KanbanBoardSettings): Promise<void> {
-		await updateBoardSettingsService(this.createServiceContext(), partial);
+		await this.boardMutationQueue.run(() =>
+			updateBoardSettingsService(this.createServiceContext(), partial),
+		);
 	}
 
 	async applyBoardColorChange(color: string | undefined): Promise<void> {
-		await applyBoardColorChangeService(this.createServiceContext(), color);
+		await this.boardMutationQueue.run(async () => {
+			await applyBoardColorChangeService(this.createServiceContext(), color);
+			const file = this.file;
+			if (file) this.data = await this.app.vault.read(file);
+		});
 	}
 
 	openAddLaneForm(): void {
@@ -166,7 +180,9 @@ export class KanbanView extends TextFileView {
 	}
 
 	async onOpen(): Promise<void> {
+		const generation = this.renderLifecycle.beginOpen();
 		await super.onOpen();
+		if (!this.renderLifecycle.canRender(generation)) return;
 		this.stopCardEventIndicatorRefresh?.();
 		this.stopCardEventIndicatorRefresh = registerKanbanCardEventIndicatorRefresh(
 			this.app,
@@ -178,7 +194,9 @@ export class KanbanView extends TextFileView {
 	}
 
 	async onClose(): Promise<void> {
+		const generation = this.renderLifecycle.beginClose();
 		await super.onClose();
+		if (!this.renderLifecycle.canUnmount(generation)) return;
 		this.stopCardEventIndicatorRefresh?.();
 		this.stopCardEventIndicatorRefresh = null;
 		Object.values(this.actionButtons).forEach((button) => button.remove());
@@ -187,8 +205,10 @@ export class KanbanView extends TextFileView {
 	}
 
 	async setState(state: Record<string, unknown>, result: ViewStateResult): Promise<void> {
+		const generation = this.renderLifecycle.capture();
 		this.viewMode = resolveKanbanViewMode(state.viewMode, this.viewMode);
 		await super.setState(state, result);
+		if (!this.renderLifecycle.canRender(generation)) return;
 		this.render();
 	}
 
@@ -226,20 +246,31 @@ export class KanbanView extends TextFileView {
 	}
 
 	private refreshCardDerivedState(): void {
-		this.cardTitleById = buildCardTitleMap(this.board);
-		this.linkedCardPaths = buildLinkedCardPathSet(this.app, this.board, this.file?.path ?? null);
-		this.cardHasEventById = buildCardEventMap(this.board, (title) =>
-			this.file
-				? hasCardLinkedEvent(this.app, this.file.path, title, KanbanView.CARD_EVENT_PROPERTY)
-				: false,
+		const sourcePath = this.file?.path;
+		const derivedState = buildCardDerivedState(this.board, (title) => {
+			if (!sourcePath) return null;
+			const linkedCardFile = resolveLinkedCardFile(this.app, sourcePath, title);
+			if (!linkedCardFile) return null;
+			return {
+				path: linkedCardFile.path,
+				hasEvent:
+					readFrontmatterString(this.app, linkedCardFile, KanbanView.CARD_EVENT_PROPERTY) !== null,
+			};
+		});
+		this.cardTitleById = derivedState.titleById;
+		this.cardHasEventById = derivedState.hasEventById;
+		this.linkedCardPaths = derivedState.linkedPaths;
+	}
+
+	private getRootActionHandlers(): KanbanRootActionHandlers {
+		this.rootActionHandlers ??= buildKanbanRootActionHandlers(this.createServiceContext(), () =>
+			this.closeAddLaneForm(),
 		);
+		return this.rootActionHandlers;
 	}
 
 	private buildRootProps(): KanbanRootProps {
 		const sourcePath = this.file?.path ?? '';
-		const actions = buildKanbanRootActionHandlers(this.createServiceContext(), () =>
-			this.closeAddLaneForm(),
-		);
 		return {
 			board: this.board,
 			markdownContext: {
@@ -252,11 +283,12 @@ export class KanbanView extends TextFileView {
 			addLaneAnchorRect: this.addLaneAnchorRect,
 			addLaneAnchorEl: this.actionButtons['add-list'],
 			cardHasEventById: this.cardHasEventById,
-			...actions,
+			...this.getRootActionHandlers(),
 		};
 	}
 
 	render(): void {
+		if (!this.renderLifecycle.canRender()) return;
 		this.contentEl.classList.add('h-full');
 		this.refreshCardDerivedState();
 		const rootProps = this.buildRootProps();
@@ -284,12 +316,17 @@ export class KanbanView extends TextFileView {
 		if (!board) return;
 		const file = this.file;
 		if (!file) {
-			new Notice('Kanban board file not found.');
-			return;
+			throw new Error('Cannot persist a kanban board without a file.');
 		}
-		const updated = serializeKanbanBoard(board, this.data ?? '');
+		const currentData = await this.app.vault.read(file);
+		const updated = serializeKanbanBoard(board, currentData);
 		this.data = updated;
-		await Promise.resolve(this.requestSave());
+		try {
+			await this.save();
+		} catch (error) {
+			this.data = currentData;
+			throw error;
+		}
 	}
 
 	private createServiceContext(): KanbanViewServiceContext {

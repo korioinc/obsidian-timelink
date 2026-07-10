@@ -5,11 +5,18 @@ export const registerWindowPointerMoveAndUp = (
 	handlePointerMove: PointerMoveHandler,
 	handlePointerUp: PointerUpHandler,
 ): (() => void) => {
-	const pointerUpHandler = handlePointerUp;
+	let finalized = false;
+	const finalize = (event: PointerEvent) => {
+		if (finalized) return;
+		finalized = true;
+		handlePointerUp(event);
+	};
 	window.addEventListener('pointermove', handlePointerMove);
-	window.addEventListener('pointerup', pointerUpHandler, { once: true });
+	window.addEventListener('pointerup', finalize, { once: true });
+	window.addEventListener('pointercancel', finalize, { once: true });
 	return () => {
 		window.removeEventListener('pointermove', handlePointerMove);
-		window.removeEventListener('pointerup', pointerUpHandler);
+		window.removeEventListener('pointerup', finalize);
+		window.removeEventListener('pointercancel', finalize);
 	};
 };

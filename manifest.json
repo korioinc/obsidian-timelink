@@ -1,7 +1,7 @@
 {
 	"id": "timelink",
 	"name": "TimeLink",
-	"version": "1.0.21",
+	"version": "1.0.22",
 	"minAppVersion": "1.7.2",
 	"description": "Kanban board, calendar, and timeline views with linked event notes.",
 	"author": "jskorlol",

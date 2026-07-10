@@ -12,14 +12,41 @@ void test('deriveTimedResizeRange returns null without active segment', () => {
 	assert.strictEqual(deriveTimedResizeRange(null, '2026-03-02', 600), null);
 });
 
-void test('buildTimedResizeEvent clamps same-day end time not to precede start time', () => {
+void test('buildTimedResizeEvent keeps one slot when same-day resize reaches the start', () => {
 	const segment = createSegment({ date: '2026-03-05', startTime: '09:00', endTime: '10:00' });
 	const nextEvent = buildTimedResizeEvent(segment, '2026-03-05', 8 * 60);
 
 	assert.strictEqual(nextEvent.date, '2026-03-05');
 	assert.strictEqual(nextEvent.endDate, undefined);
 	assert.strictEqual(nextEvent.startTime, '09:00');
-	assert.strictEqual(nextEvent.endTime, '09:00');
+	assert.strictEqual(nextEvent.endTime, '09:30');
+});
+
+void test('deriveTimedResizeRange keeps one visible slot at the event start', () => {
+	const segment = createSegment({ date: '2026-03-05', startTime: '09:00', endTime: '10:00' });
+	const range = deriveTimedResizeRange(segment, '2026-03-05', 9 * 60);
+
+	assert.ok(range);
+	assert.strictEqual(range.startDateKey, '2026-03-05');
+	assert.strictEqual(range.endDateKey, '2026-03-05');
+	assert.strictEqual(range.startMinutes, 9 * 60);
+	assert.strictEqual(range.endMinutes, 9 * 60 + 30);
+});
+
+void test('deriveTimedResizeRange preserves an existing positive duration below the resize step', () => {
+	const segment = createSegment({ date: '2026-03-05', startTime: '09:00', endTime: '09:10' });
+	const range = deriveTimedResizeRange(segment, '2026-03-05', 9 * 60 + 10, 30);
+
+	assert.ok(range);
+	assert.strictEqual(range.endMinutes, 9 * 60 + 10);
+});
+
+void test('deriveTimedResizeRange keeps a positive snapped boundary instead of adding an unsnapped step', () => {
+	const segment = createSegment({ date: '2026-03-05', startTime: '09:10', endTime: '10:00' });
+	const range = deriveTimedResizeRange(segment, '2026-03-05', 9 * 60 + 30, 30);
+
+	assert.ok(range);
+	assert.strictEqual(range.endMinutes, 9 * 60 + 30);
 });
 
 void test('buildTimedResizeEvent keeps cross-day end date and hover end time', () => {
@@ -59,6 +86,25 @@ void test('deriveTimedDragRange shifts start and end across days', () => {
 	assert.strictEqual(range.endMinutes, 12 * 60);
 });
 
+void test('deriveTimedDragRange preserves inferred overnight duration without endDate', () => {
+	const segment = createSegment(
+		{
+			date: '2026-06-12',
+			startTime: '20:00',
+			endTime: '01:01',
+		},
+		{ start: '2026-06-12', end: '2026-06-12' },
+	);
+
+	const range = deriveTimedDragRange(segment, '2026-06-15', 20 * 60);
+
+	assert.ok(range);
+	assert.strictEqual(range.startDateKey, '2026-06-15');
+	assert.strictEqual(range.startMinutes, 20 * 60);
+	assert.strictEqual(range.endDateKey, '2026-06-16');
+	assert.strictEqual(range.endMinutes, 61);
+});
+
 void test('buildTimedDragDropEvent updates date/time and preserves event fields', () => {
 	const segment = createSegment({ date: '2026-03-01', startTime: '09:00', endTime: '10:00' });
 	const beforeTitle = segment.event.title;
@@ -73,6 +119,24 @@ void test('buildTimedDragDropEvent updates date/time and preserves event fields'
 	assert.strictEqual(updated.startTime, '10:00');
 	assert.strictEqual(updated.endTime, '11:00');
 	assert.strictEqual(segment.event.date, beforeDate);
+});
+
+void test('buildTimedDragDropEvent preserves inferred overnight duration without endDate', () => {
+	const segment = createSegment(
+		{
+			date: '2026-06-12',
+			startTime: '20:00',
+			endTime: '01:01',
+		},
+		{ start: '2026-06-12', end: '2026-06-12' },
+	);
+
+	const updated = buildTimedDragDropEvent(segment, '2026-06-15', 20 * 60);
+
+	assert.strictEqual(updated.date, '2026-06-15');
+	assert.strictEqual(updated.startTime, '20:00');
+	assert.strictEqual(updated.endDate, '2026-06-16');
+	assert.strictEqual(updated.endTime, '01:01');
 });
 
 void test('buildTimedDragDropEvent rolls 24:00 start over to next-day 00:00', () => {

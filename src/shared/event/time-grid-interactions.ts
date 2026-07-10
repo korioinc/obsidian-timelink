@@ -7,6 +7,7 @@ import {
 	formatTime,
 	normalizeRange,
 	parseDateKey,
+	resolveEffectiveTimedEventRange,
 	toMinutes,
 } from './model-utils';
 import { getShiftedTimedRange } from './shifted-timed-range';
@@ -101,7 +102,7 @@ export const getDateKeyFromPointer = (clientX: number, gridRect: DOMRect, dateKe
 	return dateKeys[column] ?? null;
 };
 
-export const normalizeEndDate = (startKey: string, endKey: string) => {
+const normalizeEndDate = (startKey: string, endKey: string) => {
 	if (compareDateKey(endKey, startKey) < 0) return startKey;
 	return endKey;
 };
@@ -125,6 +126,21 @@ const resolveTimedEventStartBoundary = (segment: EventSegment) => ({
 	minutes: toMinutes(segment.event.startTime) ?? 0,
 });
 
+const resolveTimedInteractionRange = (segment: EventSegment) => {
+	const effectiveRange = resolveEffectiveTimedEventRange(segment.event);
+	if (effectiveRange) {
+		return effectiveRange;
+	}
+	const startKey = segment.event.date ?? segment.start;
+	const endKey = normalizeEndDate(startKey, segment.event.endDate ?? segment.end);
+	return {
+		startKey,
+		endKey,
+		startMinutes: toMinutes(segment.event.startTime) ?? 0,
+		endMinutes: toMinutes(segment.event.endTime) ?? 0,
+	};
+};
+
 const getTimedDragAnchorOffsetMinutes = (
 	segment: EventSegment,
 	dragAnchor: TimedDragAnchor,
@@ -143,7 +159,8 @@ export const normalizeTimeSelection = (
 ): TimeSelectionRange | null => {
 	if (!state.anchorDateKey || state.anchorMinutes === null) return null;
 	if (!state.hoverDateKey || state.hoverMinutes === null) return null;
-	const isForward = compareDateKey(state.anchorDateKey, state.hoverDateKey) <= 0;
+	const dateOrder = compareDateKey(state.anchorDateKey, state.hoverDateKey);
+	const isForward = dateOrder < 0 || (dateOrder === 0 && state.anchorMinutes <= state.hoverMinutes);
 	const { start, end } = normalizeRange(state.anchorDateKey, state.hoverDateKey);
 	const anchorMinutes = state.anchorMinutes;
 	const hoverMinutes = state.hoverMinutes;
@@ -151,7 +168,11 @@ export const normalizeTimeSelection = (
 	const maxStartMinutes = Math.max(0, MINUTES_IN_DAY - step);
 	const startMinutes = Math.min(maxStartMinutes, Math.max(0, rawStartMinutes));
 	const rawEndMinutes = isForward ? hoverMinutes : anchorMinutes;
-	const endMinutes = Math.min(MINUTES_IN_DAY, Math.max(startMinutes + step, rawEndMinutes));
+	const clampedEndMinutes = Math.min(MINUTES_IN_DAY, Math.max(0, rawEndMinutes));
+	const endMinutes =
+		start === end
+			? Math.min(MINUTES_IN_DAY, Math.max(startMinutes + step, clampedEndMinutes))
+			: clampedEndMinutes;
 	return {
 		startDateKey: start,
 		endDateKey: end,
@@ -214,21 +235,51 @@ export const deriveTimeSelectionPointerState = ({
 	return { dateKey, minutes };
 };
 
+const resolveTimedResizeEndBoundary = ({
+	startKey,
+	startMinutes,
+	endKey,
+	endMinutes,
+	minimumDurationMinutes,
+}: {
+	startKey: string;
+	startMinutes: number;
+	endKey: string;
+	endMinutes: number;
+	minimumDurationMinutes: number;
+}) => {
+	const minimumDuration = Math.max(1, minimumDurationMinutes);
+	const normalizedEndMinutes =
+		endKey === startKey && endMinutes <= startMinutes ? startMinutes + minimumDuration : endMinutes;
+	return normalizeBoundaryDateAndMinutes(endKey, normalizedEndMinutes);
+};
+
 export const deriveTimedResizeRange = (
 	timedResizing: EventSegment | null,
 	timedResizeHoverDateKey: string | null,
 	timedResizeHoverMinutes: number | null,
+	minimumDurationMinutes = DEFAULT_STEP_MINUTES,
 ): TimeSelectionRange | null => {
 	if (!timedResizing) return null;
-	const startKey = timedResizing.event.date ?? timedResizing.start;
-	const endKey = normalizeEndDate(startKey, timedResizeHoverDateKey ?? startKey);
-	const startMinutes = toMinutes(timedResizing.event.startTime) ?? 0;
-	const endMinutes = timedResizeHoverMinutes ?? toMinutes(timedResizing.event.endTime) ?? 0;
+	const range = resolveTimedInteractionRange(timedResizing);
+	const startKey = range.startKey;
+	const endKey = timedResizeHoverDateKey
+		? normalizeEndDate(startKey, timedResizeHoverDateKey)
+		: range.endKey;
+	const startMinutes = range.startMinutes;
+	const endMinutes = timedResizeHoverMinutes ?? range.endMinutes;
+	const normalizedEnd = resolveTimedResizeEndBoundary({
+		startKey,
+		startMinutes,
+		endKey,
+		endMinutes,
+		minimumDurationMinutes,
+	});
 	return {
 		startDateKey: startKey,
-		endDateKey: endKey,
+		endDateKey: normalizedEnd.dateKey,
 		startMinutes,
-		endMinutes,
+		endMinutes: normalizedEnd.minutes,
 	};
 };
 
@@ -236,14 +287,22 @@ export const buildTimedResizeEvent = (
 	timedResizing: EventSegment,
 	timedResizeHoverDateKey: string | null,
 	timedResizeHoverMinutes: number | null,
+	minimumDurationMinutes = DEFAULT_STEP_MINUTES,
 ): CalendarEvent => {
-	const startKey = timedResizing.event.date ?? timedResizing.start;
-	const endKey = normalizeEndDate(startKey, timedResizeHoverDateKey ?? startKey);
-	const startMinutes = toMinutes(timedResizing.event.startTime) ?? 0;
-	const endMinutes = timedResizeHoverMinutes ?? toMinutes(timedResizing.event.endTime) ?? 0;
-	const normalizedEndMinutes =
-		endKey === startKey ? Math.max(startMinutes, endMinutes) : endMinutes;
-	const normalizedEnd = normalizeBoundaryDateAndMinutes(endKey, normalizedEndMinutes);
+	const range = resolveTimedInteractionRange(timedResizing);
+	const startKey = range.startKey;
+	const endKey = timedResizeHoverDateKey
+		? normalizeEndDate(startKey, timedResizeHoverDateKey)
+		: range.endKey;
+	const startMinutes = range.startMinutes;
+	const endMinutes = timedResizeHoverMinutes ?? range.endMinutes;
+	const normalizedEnd = resolveTimedResizeEndBoundary({
+		startKey,
+		startMinutes,
+		endKey,
+		endMinutes,
+		minimumDurationMinutes,
+	});
 	return {
 		...timedResizing.event,
 		endDate: normalizedEnd.dateKey === startKey ? undefined : normalizedEnd.dateKey,
@@ -258,10 +317,11 @@ export const deriveTimedDragRange = (
 	timedDragHoverMinutes: number | null,
 ): TimeSelectionRange | null => {
 	if (!timedDragging) return null;
-	const baseStartKey = timedDragging.event.date ?? timedDragging.start;
-	const baseEndKey = timedDragging.event.endDate ?? timedDragging.end ?? baseStartKey;
-	const baseStartMinutes = toMinutes(timedDragging.event.startTime) ?? 0;
-	const baseEndMinutes = toMinutes(timedDragging.event.endTime) ?? 0;
+	const range = resolveTimedInteractionRange(timedDragging);
+	const baseStartKey = range.startKey;
+	const baseEndKey = range.endKey;
+	const baseStartMinutes = range.startMinutes;
+	const baseEndMinutes = range.endMinutes;
 	const hoverKey = timedDragHoverDateKey ?? baseStartKey;
 	const hoverMinutes = timedDragHoverMinutes ?? baseStartMinutes;
 	const { startMinutes, endMinutes, endDateKey } = getShiftedTimedRange({
@@ -302,10 +362,11 @@ export const buildTimedDragDropEvent = (
 	hoverKey: string,
 	hoverMinutes: number,
 ): CalendarEvent => {
-	const baseDate = timedDragging.event.date ?? timedDragging.start;
-	const baseEndKey = timedDragging.event.endDate ?? timedDragging.end ?? baseDate;
-	const baseStartMinutes = toMinutes(timedDragging.event.startTime) ?? 0;
-	const baseEndMinutes = toMinutes(timedDragging.event.endTime) ?? 0;
+	const range = resolveTimedInteractionRange(timedDragging);
+	const baseDate = range.startKey;
+	const baseEndKey = range.endKey;
+	const baseStartMinutes = range.startMinutes;
+	const baseEndMinutes = range.endMinutes;
 	const offsetDays = diffInDays(parseDateKey(baseDate), parseDateKey(hoverKey));
 	const { startMinutes, endMinutes, endDateKey } = getShiftedTimedRange({
 		baseStartKey: baseDate,

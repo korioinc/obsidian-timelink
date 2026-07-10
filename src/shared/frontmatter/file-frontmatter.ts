@@ -17,8 +17,6 @@ export type FrontmatterMutationApp = {
 	};
 };
 
-export type FrontmatterApp = FrontmatterMetadataApp & FrontmatterMutationApp;
-
 const getFileFrontmatter = (
 	app: FrontmatterMetadataApp,
 	file: FrontmatterFileLike,

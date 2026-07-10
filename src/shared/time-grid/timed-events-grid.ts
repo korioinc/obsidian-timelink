@@ -1,8 +1,8 @@
 import {
 	assignColumns,
 	compareDateKey,
-	isTimedEvent,
 	MINUTES_IN_DAY,
+	resolveEffectiveTimedEventRange,
 	toMinutes,
 } from '../event/model-utils';
 import type { EventSegment, TimedEventPlacement, TimeSelectionRange } from '../event/types';
@@ -51,16 +51,17 @@ export const buildTimedDayEntries = ({
 
 	for (const segment of segments) {
 		const event = segment.event;
-		if (!isTimedEvent(event)) continue;
-		const startKey = event.date ?? segment.start;
-		const endKey = event.endDate ?? segment.end ?? startKey;
+		const range = resolveEffectiveTimedEventRange(event);
+		if (!range) continue;
+		const startKey = range.startKey;
+		const endKey = range.endKey;
 		if (compareDateKey(dayKey, startKey) < 0 || compareDateKey(dayKey, endKey) > 0) {
 			continue;
 		}
 		const isStartDay = dayKey === startKey;
 		const isEndDay = dayKey === endKey;
-		const startMinutes = isStartDay ? (toMinutes(event.startTime) ?? 0) : 0;
-		const endMinutes = isEndDay ? (toMinutes(event.endTime) ?? MINUTES_IN_DAY) : MINUTES_IN_DAY;
+		const startMinutes = isStartDay ? range.startMinutes : 0;
+		const endMinutes = isEndDay ? range.endMinutes : MINUTES_IN_DAY;
 		pushEntry(segment, startMinutes, endMinutes);
 	}
 

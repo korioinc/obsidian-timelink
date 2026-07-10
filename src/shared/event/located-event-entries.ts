@@ -1,7 +1,7 @@
 import { buildEventId } from './model-utils';
 import type { CalendarEvent, EditableEventResponse, EventLocation } from './types';
 
-export type LocatedEventEntry = {
+type LocatedEventEntry = {
 	id: string;
 	event: CalendarEvent & { id: string };
 	location: EventLocation;

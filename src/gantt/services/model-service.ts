@@ -1,7 +1,10 @@
 import { KANBAN_LIST_MAX_DEPTH } from '../../kanban-list/constants';
 import { collectKanbanBoards } from '../../kanban-list/services/model-service';
-import { collectLinkedEventFiles, resolveLinkedCardFile } from '../../kanban/services/card-service';
+import type { KanbanCollectionApp } from '../../kanban-list/services/model-service';
+import type { KanbanListItem } from '../../kanban-list/types';
+import { resolveLinkedCardFile } from '../../kanban/services/card-service';
 import { parseKanbanBoard } from '../../kanban/services/parser-service';
+import { getFirstWikiLinkPath } from '../../kanban/utils/card-title';
 import { resolveNormalizedEventDateRange } from '../../shared/event/date-range';
 import {
 	compareDateKey,
@@ -12,7 +15,10 @@ import {
 	parseDateKey,
 } from '../../shared/event/model-utils';
 import { toEventFromFrontmatter } from '../../shared/event/note-calendar-utils';
+import { readFrontmatterValue } from '../../shared/frontmatter/file-frontmatter';
 import { TIMELINK_EVENT_KEY } from '../../shared/frontmatter/timelink-frontmatter';
+import { mapWithConcurrency } from '../../shared/utils/map-with-concurrency';
+import { isPathInDirectory } from '../../shared/vault/register-vault-path-refresh';
 import type {
 	GanttBoardSchedule,
 	GanttDayCell,
@@ -24,13 +30,12 @@ import type {
 import type { TFile } from 'obsidian';
 
 type CollectGanttBoardSchedulesParams = {
-	app: {
-		vault: {
+	app: KanbanCollectionApp & {
+		vault: KanbanCollectionApp['vault'] & {
 			getAbstractFileByPath: (path: string) => unknown;
-			cachedRead: (file: TFile) => Promise<string>;
 		};
-		metadataCache: {
-			getFileCache: (file: TFile) => { frontmatter?: Record<string, unknown> } | null | undefined;
+		metadataCache: KanbanCollectionApp['metadataCache'] & {
+			getFirstLinkpathDest: (path: string, sourcePath: string) => unknown;
 		};
 	};
 	calendarFolderPath: string;
@@ -52,8 +57,7 @@ const compareRows = (left: GanttScheduleRow, right: GanttScheduleRow): number =>
 	return left.title.localeCompare(right.title);
 };
 
-const isPathInDirectory = (path: string, directory: string): boolean =>
-	path === directory || path.startsWith(`${directory}/`);
+const GANTT_BOARD_READ_CONCURRENCY = 4;
 
 const buildYearBoundaryDateKey = (year: number, month: number, day: number): string =>
 	`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -66,18 +70,14 @@ const clampDateKey = (value: string, min: string, max: string): string => {
 
 const buildMonthCells = (year: number): GanttMonthCell[] => {
 	const formatter = new Intl.DateTimeFormat(undefined, { month: 'short' });
-	let offset = 0;
 	return Array.from({ length: 12 }, (_, monthIndex) => {
 		const firstDay = new Date(year, monthIndex, 1);
 		const dayCount = new Date(year, monthIndex + 1, 0).getDate();
-		const cell: GanttMonthCell = {
+		return {
 			key: `${year}-${String(monthIndex + 1).padStart(2, '0')}`,
 			label: formatter.format(firstDay),
 			dayCount,
-			startDayIndex: offset,
 		};
-		offset += dayCount;
-		return cell;
 	});
 };
 
@@ -89,68 +89,71 @@ const buildDayCells = (months: GanttMonthCell[]): GanttDayCell[] =>
 		})),
 	);
 
+const collectGanttBoardSchedule = async (
+	app: CollectGanttBoardSchedulesParams['app'],
+	calendarFolderPath: string,
+	boardItem: KanbanListItem,
+): Promise<GanttBoardSchedule | null> => {
+	const boardFile = app.vault.getAbstractFileByPath(boardItem.path);
+	if (!isFileLike(boardFile)) return null;
+	const markdown = await app.vault.cachedRead(boardFile);
+	const board = parseKanbanBoard(markdown);
+	const dependencyPaths = new Set<string>([boardItem.path]);
+	const linkedEventFiles = new Set<FileLike>();
+
+	for (const lane of board.lanes) {
+		for (const card of lane.cards) {
+			const linkedCardFile = resolveLinkedCardFile(app, boardFile.path, card.title);
+			if (!linkedCardFile) continue;
+			dependencyPaths.add(linkedCardFile.path);
+			const eventLinkValue = readFrontmatterValue(app, linkedCardFile, TIMELINK_EVENT_KEY);
+			if (typeof eventLinkValue !== 'string' || !eventLinkValue.trim()) continue;
+			const eventPath = getFirstWikiLinkPath(eventLinkValue);
+			if (!eventPath) continue;
+			const eventFile = app.metadataCache.getFirstLinkpathDest(eventPath, linkedCardFile.path);
+			if (isFileLike(eventFile)) {
+				linkedEventFiles.add(eventFile);
+			}
+		}
+	}
+
+	const rows: GanttScheduleRow[] = [];
+	for (const eventFile of linkedEventFiles) {
+		if (!isPathInDirectory(eventFile.path, calendarFolderPath)) continue;
+		dependencyPaths.add(eventFile.path);
+		const frontmatter = app.metadataCache.getFileCache(eventFile)?.frontmatter;
+		if (!frontmatter) continue;
+		const event = toEventFromFrontmatter(frontmatter, eventFile.basename);
+		const range = resolveNormalizedEventDateRange(event);
+		if (!range) continue;
+		rows.push({
+			id: `${boardFile.path}:${eventFile.path}`,
+			title: event.title,
+			startKey: range.startKey,
+			endKey: range.endKey,
+			color: normalizeEventColor(event.color) ?? boardItem.kanbanColor ?? DEFAULT_EVENT_COLOR,
+		});
+	}
+
+	return {
+		path: boardItem.path,
+		basename: boardItem.basename,
+		kanbanColor: boardItem.kanbanColor,
+		rows: rows.sort(compareRows),
+		dependencyPaths: Array.from(dependencyPaths).sort(),
+	};
+};
+
 export const collectGanttBoardSchedules = async ({
 	app,
 	calendarFolderPath,
 	maxDepth = KANBAN_LIST_MAX_DEPTH,
 }: CollectGanttBoardSchedulesParams): Promise<GanttBoardSchedule[]> => {
-	const boards = await collectKanbanBoards(app as never, maxDepth);
-	const results: GanttBoardSchedule[] = [];
-
-	for (const boardItem of boards) {
-		const boardFile = app.vault.getAbstractFileByPath(boardItem.path);
-		if (!isFileLike(boardFile)) continue;
-		const markdown = await app.vault.cachedRead(boardFile);
-		const board = parseKanbanBoard(markdown);
-		const linkedCardPaths = new Set<string>();
-		for (const lane of board.lanes) {
-			for (const card of lane.cards) {
-				const linkedCardFile = resolveLinkedCardFile(app as never, boardFile.path, card.title);
-				if (linkedCardFile) {
-					linkedCardPaths.add(linkedCardFile.path);
-				}
-			}
-		}
-
-		const linkedEventFiles = collectLinkedEventFiles(
-			app as never,
-			board,
-			boardFile.path,
-			TIMELINK_EVENT_KEY,
-		);
-		const linkedEventPaths = Array.from(linkedEventFiles)
-			.map((file) => file.path)
-			.filter((path) => isPathInDirectory(path, calendarFolderPath));
-		const rows: GanttScheduleRow[] = [];
-
-		for (const eventFile of linkedEventFiles) {
-			if (!isPathInDirectory(eventFile.path, calendarFolderPath)) continue;
-			const frontmatter = app.metadataCache.getFileCache(eventFile)?.frontmatter;
-			if (!frontmatter) continue;
-			const event = toEventFromFrontmatter(frontmatter, eventFile.basename);
-			const range = resolveNormalizedEventDateRange(event);
-			if (!range) continue;
-			rows.push({
-				id: `${boardFile.path}:${eventFile.path}`,
-				title: event.title,
-				boardPath: boardFile.path,
-				sourceEventPath: eventFile.path,
-				startKey: range.startKey,
-				endKey: range.endKey,
-				color: normalizeEventColor(event.color) ?? boardItem.kanbanColor ?? DEFAULT_EVENT_COLOR,
-			});
-		}
-
-		results.push({
-			...boardItem,
-			rows: rows.sort(compareRows),
-			linkedCardPaths: Array.from(linkedCardPaths).sort(),
-			linkedEventPaths: linkedEventPaths.sort(),
-			dependencyPaths: [boardItem.path, ...Array.from(linkedCardPaths), ...linkedEventPaths].sort(),
-		});
-	}
-
-	return results;
+	const boards = await collectKanbanBoards(app, maxDepth);
+	const schedules = await mapWithConcurrency(boards, GANTT_BOARD_READ_CONCURRENCY, (board) =>
+		collectGanttBoardSchedule(app, calendarFolderPath, board),
+	);
+	return schedules.filter((schedule): schedule is GanttBoardSchedule => schedule !== null);
 };
 
 export const buildGanttYearView = (
@@ -165,37 +168,23 @@ export const buildGanttYearView = (
 	const todayKey = formatDateKey(todayDate);
 	const todayDayIndex =
 		todayDate.getFullYear() === year ? diffInDays(yearStartDate, parseDateKey(todayKey)) : null;
-	const boardGroups = boards
-		.map((board) => {
-			const rows = board.rows
-				.filter((row) => compareDateKey(row.endKey, yearStartKey) >= 0)
-				.filter((row) => compareDateKey(row.startKey, yearEndKey) <= 0)
-				.map((row) => {
-					const startKey = clampDateKey(row.startKey, yearStartKey, yearEndKey);
-					const endKey = clampDateKey(row.endKey, yearStartKey, yearEndKey);
-					const spanDays = diffInDays(parseDateKey(startKey), parseDateKey(endKey)) + 1;
-					return {
-						...row,
-						startKey,
-						endKey,
-						startDayIndex: diffInDays(yearStartDate, parseDateKey(startKey)),
-						spanDays,
-					};
-				});
+	const rows: GanttDisplayRow[] = boards.flatMap((board) => {
+		const visibleRows = board.rows
+			.filter((row) => compareDateKey(row.endKey, yearStartKey) >= 0)
+			.filter((row) => compareDateKey(row.startKey, yearEndKey) <= 0)
+			.map((row) => {
+				const startKey = clampDateKey(row.startKey, yearStartKey, yearEndKey);
+				const endKey = clampDateKey(row.endKey, yearStartKey, yearEndKey);
+				return {
+					id: row.id,
+					title: row.title,
+					color: row.color,
+					startDayIndex: diffInDays(yearStartDate, parseDateKey(startKey)),
+					spanDays: diffInDays(parseDateKey(startKey), parseDateKey(endKey)) + 1,
+				};
+			});
 
-			return {
-				path: board.path,
-				basename: board.basename,
-				folderPath: board.folderPath,
-				folderDepth: board.folderDepth,
-				mtime: board.mtime,
-				kanbanColor: board.kanbanColor,
-				rows,
-			};
-		})
-		.filter((board) => board.rows.length > 0);
-	const rows: GanttDisplayRow[] = boardGroups.flatMap((board) =>
-		board.rows.map((row, index) => ({
+		return visibleRows.map((row, index) => ({
 			...row,
 			boardLabel:
 				index === 0
@@ -205,8 +194,8 @@ export const buildGanttYearView = (
 							kanbanColor: board.kanbanColor,
 						}
 					: null,
-		})),
-	);
+		}));
+	});
 
 	return {
 		year,
@@ -214,7 +203,6 @@ export const buildGanttYearView = (
 		months,
 		dayCells: buildDayCells(months),
 		todayDayIndex,
-		boardGroups,
 		rows,
 	};
 };

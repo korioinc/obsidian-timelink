@@ -35,7 +35,11 @@ export function useLaneCardEditorState({
 	const submitLaneTitle = async () => {
 		const title = draftLaneTitle.trim();
 		if (!title) return;
-		await onUpdateLaneTitle(laneId, title);
+		try {
+			await onUpdateLaneTitle(laneId, title);
+		} catch {
+			return;
+		}
 		setIsEditingTitle(false);
 	};
 
@@ -53,6 +57,8 @@ export function useLaneCardEditorState({
 			await onAddCard(laneId, title);
 			setDraftTitle('');
 			setIsAdding(false);
+		} catch {
+			return;
 		} finally {
 			isSubmittingCardRef.current = false;
 		}
@@ -73,7 +79,11 @@ export function useLaneCardEditorState({
 		const title = normalizeCardTitle(nextValue ?? draftCardTitle);
 		if (!title) return;
 		const cardId = editingCardId;
-		await onUpdateCardTitle(cardId, title);
+		try {
+			await onUpdateCardTitle(cardId, title);
+		} catch {
+			return;
+		}
 		setEditingCardId(null);
 		setDraftCardTitle('');
 		cardTitleRef.current.delete(cardId);

@@ -39,7 +39,7 @@ type UseAllDayEventInteractionsResult = {
 	handleDragStart: (event: DragEvent, segment: EventSegment) => void;
 	handleDragEnd: () => void;
 	handleResizeBarStart: (segment: EventSegment) => void;
-	beginDragFromPopover: (event: DragEvent, segment: EventSegment) => void;
+	beginDragFromPopover: (event: DragEvent, segment: EventSegment, sourceDateKey?: string) => void;
 	handleDragOverCapture: (event: DragEvent) => void;
 	handleDragEnterCapture: (event: DragEvent) => void;
 	handleDropCapture: (event: DragEvent) => void;
@@ -58,6 +58,7 @@ export const useAllDayEventInteractions = ({
 	const [allDayResizing, setAllDayResizing] = useState<EventSegment | null>(null);
 	const [allDayResizeHoverDateKey, setAllDayResizeHoverDateKey] = useState<string | null>(null);
 	const didDropRef = useRef(false);
+	const dragAnchorOffsetDaysRef = useRef(0);
 
 	const { dragRange, resizeRange, dragHoverIndex } = useMemo(
 		() =>
@@ -94,6 +95,7 @@ export const useAllDayEventInteractions = ({
 		setDragHoverDateKey,
 		didDropRef,
 		getDateKeyFromPointer,
+		dragAnchorOffsetDaysRef,
 	);
 
 	const handleResizeStart = handleResizeStartFactory(
@@ -110,6 +112,7 @@ export const useAllDayEventInteractions = ({
 		didDropRef,
 		popoverDragRef,
 		createDragImage,
+		dragAnchorOffsetDaysRef,
 	);
 
 	useEffect(() => {
@@ -133,6 +136,7 @@ export const useAllDayEventInteractions = ({
 			getDateKeyFromPointer,
 			setDragHoverDateKey,
 			handleDrop,
+			dragAnchorOffsetDaysRef,
 		);
 
 	return {

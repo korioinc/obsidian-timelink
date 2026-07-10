@@ -1,4 +1,4 @@
-type AnyFn = (...args: unknown[]) => unknown;
+type AnyFn = (...args: never[]) => unknown;
 
 type AroundSpec<T extends object> = {
 	[K in keyof T]?: (next: AnyFn) => AnyFn;
@@ -25,3 +25,6 @@ export function around<T extends object>(obj: T, spec: AroundSpec<T>): () => voi
 		}
 	};
 }
+
+export const invokeAround = (fn: AnyFn, thisArg: unknown, args: unknown[] = []): unknown =>
+	Reflect.apply(fn, thisArg, args);
